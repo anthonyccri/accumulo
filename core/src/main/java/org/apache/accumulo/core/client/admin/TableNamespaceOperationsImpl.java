@@ -18,6 +18,7 @@ package org.apache.accumulo.core.client.admin;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.apache.accumulo.core.Constants;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
 import org.apache.accumulo.core.client.Instance;
+import org.apache.accumulo.core.client.TableExistsException;
 import org.apache.accumulo.core.client.TableNamespaceExistsException;
 import org.apache.accumulo.core.client.TableNamespaceNotEmptyException;
 import org.apache.accumulo.core.client.TableNamespaceNotFoundException;
@@ -50,7 +52,7 @@ import org.apache.accumulo.core.client.impl.thrift.ThriftTableOperationException
 import org.apache.accumulo.core.iterators.IteratorUtil;
 import org.apache.accumulo.core.master.thrift.MasterClientService;
 import org.apache.accumulo.core.master.thrift.TableOperation;
-import org.apache.accumulo.core.security.thrift.TCredentials;
+import org.apache.accumulo.core.security.Credentials;
 import org.apache.accumulo.core.util.ArgumentChecker;
 import org.apache.accumulo.core.util.ByteBufferUtil;
 import org.apache.accumulo.core.util.OpTimer;
@@ -67,22 +69,22 @@ import org.apache.thrift.transport.TTransportException;
  */
 public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
   private Instance instance;
-  private TCredentials credentials;
-  
+  private Credentials credentials;
+
   private static final Logger log = Logger.getLogger(TableOperations.class);
-  
+
   /**
    * @param instance
    *          the connection information for this instance
    * @param credentials
    *          the username/password for this connection
    */
-  public TableNamespaceOperationsImpl(Instance instance, TCredentials credentials) {
+  public TableNamespaceOperationsImpl(Instance instance, Credentials credentials) {
     ArgumentChecker.notNull(instance, credentials);
     this.instance = instance;
     this.credentials = credentials;
   }
-  
+
   /**
    * Retrieve a list of table namespaces in Accumulo.
    * 
@@ -95,7 +97,7 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
     opTimer.stop("Fetched " + namespaces.size() + " table namespaces in %DURATION%");
     return namespaces;
   }
-  
+
   /**
    * A method to check if a table namespace exists in Accumulo.
    * 
@@ -106,13 +108,13 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
   @Override
   public boolean exists(String namespace) {
     ArgumentChecker.notNull(namespace);
-    
+
     OpTimer opTimer = new OpTimer(log, Level.TRACE).start("Checking if table namespace " + namespace + " exists...");
     boolean exists = TableNamespaces.getNameToIdMap(instance).containsKey(namespace);
     opTimer.stop("Checked existance of " + exists + " in %DURATION%");
     return exists;
   }
-  
+
   /**
    * Create a table namespace with no special configuration
    * 
@@ -129,7 +131,7 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
   public void create(String namespace) throws AccumuloException, AccumuloSecurityException, TableNamespaceExistsException {
     create(namespace, true, TimeType.MILLIS);
   }
-  
+
   /**
    * @param namespace
    *          the name of the table namespace
@@ -140,7 +142,7 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
   public void create(String namespace, boolean limitVersion) throws AccumuloException, AccumuloSecurityException, TableNamespaceExistsException {
     create(namespace, limitVersion, TimeType.MILLIS);
   }
-  
+
   /**
    * @param namespace
    *          the name of the table namespace
@@ -153,11 +155,11 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
   public void create(String namespace, boolean limitVersion, TimeType timeType) throws AccumuloException, AccumuloSecurityException,
       TableNamespaceExistsException {
     ArgumentChecker.notNull(namespace, timeType);
-    
+
     List<ByteBuffer> args = Arrays.asList(ByteBuffer.wrap(namespace.getBytes()), ByteBuffer.wrap(timeType.name().getBytes()));
-    
+
     Map<String,String> opts = IteratorUtil.generateInitialTableProperties(limitVersion);
-    
+
     try {
       doTableNamespaceOperation(TableOperation.CREATE, args, opts);
     } catch (TableNamespaceNotFoundException e1) {
@@ -165,13 +167,13 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
       throw new RuntimeException(e1);
     }
   }
-  
+
   private long beginTableNamespaceOperation() throws ThriftSecurityException, TException {
     while (true) {
       MasterClientService.Iface client = null;
       try {
         client = MasterClient.getConnectionWithRetry(instance);
-        return client.beginTableNamespaceOperation(Tracer.traceInfo(), credentials);
+        return client.beginTableNamespaceOperation(Tracer.traceInfo(), credentials.toThrift(instance));
       } catch (TTransportException tte) {
         log.debug("Failed to call beginTableOperation(), retrying ... ", tte);
         UtilWaitThread.sleep(100);
@@ -180,14 +182,14 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
       }
     }
   }
-  
+
   private void executeTableNamespaceOperation(long opid, TableOperation op, List<ByteBuffer> args, Map<String,String> opts, boolean autoCleanUp)
       throws ThriftSecurityException, TException, ThriftTableOperationException {
     while (true) {
       MasterClientService.Iface client = null;
       try {
         client = MasterClient.getConnectionWithRetry(instance);
-        client.executeTableNamespaceOperation(Tracer.traceInfo(), credentials, opid, op, args, opts, autoCleanUp);
+        client.executeTableNamespaceOperation(Tracer.traceInfo(), credentials.toThrift(instance), opid, op, args, opts, autoCleanUp);
         break;
       } catch (TTransportException tte) {
         log.debug("Failed to call executeTableOperation(), retrying ... ", tte);
@@ -197,13 +199,13 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
       }
     }
   }
-  
+
   private String waitForTableNamespaceOperation(long opid) throws ThriftSecurityException, TException, ThriftTableOperationException {
     while (true) {
       MasterClientService.Iface client = null;
       try {
         client = MasterClient.getConnectionWithRetry(instance);
-        return client.waitForTableNamespaceOperation(Tracer.traceInfo(), credentials, opid);
+        return client.waitForTableNamespaceOperation(Tracer.traceInfo(), credentials.toThrift(instance), opid);
       } catch (TTransportException tte) {
         log.debug("Failed to call waitForTableOperation(), retrying ... ", tte);
         UtilWaitThread.sleep(100);
@@ -212,13 +214,13 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
       }
     }
   }
-  
+
   private void finishTableNamespaceOperation(long opid) throws ThriftSecurityException, TException {
     while (true) {
       MasterClientService.Iface client = null;
       try {
         client = MasterClient.getConnectionWithRetry(instance);
-        client.finishTableNamespaceOperation(Tracer.traceInfo(), credentials, opid);
+        client.finishTableNamespaceOperation(Tracer.traceInfo(), credentials.toThrift(instance), opid);
         break;
       } catch (TTransportException tte) {
         log.debug("Failed to call finishTableOperation(), retrying ... ", tte);
@@ -228,16 +230,16 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
       }
     }
   }
-  
+
   private String doTableNamespaceOperation(TableOperation op, List<ByteBuffer> args, Map<String,String> opts) throws AccumuloSecurityException,
       TableNamespaceExistsException, TableNamespaceNotFoundException, AccumuloException {
     return doTableNamespaceOperation(op, args, opts, true);
   }
-  
+
   private String doTableNamespaceOperation(TableOperation op, List<ByteBuffer> args, Map<String,String> opts, boolean wait) throws AccumuloSecurityException,
       TableNamespaceExistsException, TableNamespaceNotFoundException, AccumuloException {
     Long opid = null;
-    
+
     try {
       opid = beginTableNamespaceOperation();
       executeTableNamespaceOperation(opid, op, args, opts, !wait);
@@ -276,7 +278,7 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
         }
     }
   }
-  
+
   /**
    * Delete a table namespace if empty
    * 
@@ -288,14 +290,14 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
    *           if the user does not have permission
    * @throws TableNamespaceNotFoundException
    *           if the table namespace does not exist
-   * @throws TableNamespaceNotEmptyException 
+   * @throws TableNamespaceNotEmptyException
    *           if the table namespaces still contains tables
    */
   @Override
   public void delete(String namespace) throws AccumuloException, AccumuloSecurityException, TableNamespaceNotFoundException, TableNamespaceNotEmptyException {
     delete(namespace, false);
   }
-  
+
   /**
    * Delete a table namespace
    * 
@@ -309,18 +311,19 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
    *           if the user does not have permission
    * @throws TableNamespaceNotFoundException
    *           if the table namespace does not exist
-   * @throws TableNamespaceNotEmptyException 
+   * @throws TableNamespaceNotEmptyException
    */
   @Override
-  public void delete(String namespace, boolean deleteTables) throws AccumuloException, AccumuloSecurityException, TableNamespaceNotFoundException, TableNamespaceNotEmptyException {
+  public void delete(String namespace, boolean deleteTables) throws AccumuloException, AccumuloSecurityException, TableNamespaceNotFoundException,
+      TableNamespaceNotEmptyException {
     ArgumentChecker.notNull(namespace);
     String namespaceId = TableNamespaces.getNamespaceId(instance, namespace);
-    
+
     if (namespaceId.equals(Constants.SYSTEM_TABLE_NAMESPACE_ID) || namespaceId.equals(Constants.DEFAULT_TABLE_NAMESPACE_ID)) {
       String why = "Can't delete the system or default table namespace";
       throw new RuntimeException(why);
     }
-    
+
     if (TableNamespaces.getTableIds(instance, namespaceId).size() > 0) {
       if (!deleteTables) {
         throw new TableNamespaceNotEmptyException(namespaceId, namespace, null);
@@ -333,19 +336,84 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
         }
       }
     }
-    
+
     List<ByteBuffer> args = Arrays.asList(ByteBuffer.wrap(namespace.getBytes()));
     Map<String,String> opts = new HashMap<String,String>();
-    
+
     try {
       doTableNamespaceOperation(TableOperation.DELETE, args, opts);
     } catch (TableNamespaceExistsException e) {
       // should not happen
       throw new RuntimeException(e);
     }
-    
+
   }
-  
+
+  /**
+   * Clone a all the tables in a table namespace to a new table namespace. Optionally copy all their properties as well.
+   * 
+   * @param srcName
+   *          The table namespace to clone
+   * @param newName
+   *          The new table namespace to clone to
+   * @param flush
+   *          Whether to flush each table before cloning
+   * @param propertiesToSet
+   *          Which table namespace properties to set
+   * @param propertiesToExclude
+   *          Which table namespace properties to exclude
+   * @param copyTableProps
+   *          Whether to copy each table's properties
+   * @throws AccumuloSecurityException
+   *           when the user does not have the proper permissions
+   * @throws AccumuloException
+   *           when there is a general accumulo error
+   * @throws TableNamespaceNotFoundException
+   *           If the old table namespace doesn't exist
+   * @throws TableNamespaceExistsException
+   *           If the new table namespace already exists
+   */
+  @Override
+  public void clone(String srcName, String newName, boolean flush, Map<String,String> propertiesToSet, Set<String> propertiesToExclude, Boolean copyTableProps)
+      throws AccumuloSecurityException, AccumuloException, TableNamespaceNotFoundException, TableNamespaceExistsException {
+
+    ArgumentChecker.notNull(srcName, newName);
+
+    String namespaceId = TableNamespaces.getNamespaceId(instance, srcName);
+
+    if (propertiesToExclude == null)
+      propertiesToExclude = Collections.emptySet();
+
+    if (propertiesToSet == null)
+      propertiesToSet = Collections.emptyMap();
+
+    if (!Collections.disjoint(propertiesToExclude, propertiesToSet.keySet()))
+      throw new IllegalArgumentException("propertiesToSet and propertiesToExclude not disjoint");
+
+    String srcNamespaceId = TableNamespaces.getNamespaceId(instance, srcName);
+    List<ByteBuffer> args = Arrays.asList(ByteBuffer.wrap(srcNamespaceId.getBytes()), ByteBuffer.wrap(newName.getBytes()));
+    Map<String,String> opts = new HashMap<String,String>();
+    opts.putAll(propertiesToSet);
+    for (String prop : propertiesToExclude)
+      opts.put(prop, null);
+    doTableNamespaceOperation(TableOperation.CLONE, args, opts);
+
+    for (String tableId : TableNamespaces.getTableIds(instance, namespaceId)) {
+      try {
+        String tableName = Tables.getTableName(instance, tableId);
+
+        String newTableName = newName + "." + Tables.extractTableName(tableName);
+        getTableOperations().clone(tableName, newTableName, flush, null, null);
+      } catch (TableNotFoundException e) {
+        String why = "Table (" + tableId + ") dissappeared while cloning namespace (" + srcName + ")";
+        throw new IllegalStateException(why);
+      } catch (TableExistsException e) {
+        String why = "Table somehow already existed in the newly created namespace (" + newName + ")";
+        throw new IllegalStateException(why);
+      }
+    }
+  }
+
   /**
    * Rename a table namespace
    * 
@@ -365,12 +433,12 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
   @Override
   public void rename(String oldNamespaceName, String newNamespaceName) throws AccumuloSecurityException, TableNamespaceNotFoundException, AccumuloException,
       TableNamespaceExistsException {
-    
+
     List<ByteBuffer> args = Arrays.asList(ByteBuffer.wrap(oldNamespaceName.getBytes()), ByteBuffer.wrap(newNamespaceName.getBytes()));
     Map<String,String> opts = new HashMap<String,String>();
     doTableNamespaceOperation(TableOperation.RENAME, args, opts);
   }
-  
+
   /**
    * Sets a property on a table namespace
    * 
@@ -388,15 +456,15 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
   @Override
   public void setProperty(final String namespace, final String property, final String value) throws AccumuloException, AccumuloSecurityException {
     ArgumentChecker.notNull(namespace, property, value);
-    
+
     MasterClient.execute(instance, new ClientExec<MasterClientService.Client>() {
       @Override
       public void execute(MasterClientService.Client client) throws Exception {
-        client.setTableNamespaceProperty(Tracer.traceInfo(), credentials, namespace, property, value);
+        client.setTableNamespaceProperty(Tracer.traceInfo(), credentials.toThrift(instance), namespace, property, value);
       }
     });
   }
-  
+
   /**
    * Removes a property from a table namespace
    * 
@@ -412,15 +480,15 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
   @Override
   public void removeProperty(final String namespace, final String property) throws AccumuloException, AccumuloSecurityException {
     ArgumentChecker.notNull(namespace, property);
-    
+
     MasterClient.execute(instance, new ClientExec<MasterClientService.Client>() {
       @Override
       public void execute(MasterClientService.Client client) throws Exception {
-        client.removeTableNamespaceProperty(Tracer.traceInfo(), credentials, namespace, property);
+        client.removeTableNamespaceProperty(Tracer.traceInfo(), credentials.toThrift(instance), namespace, property);
       }
     });
   }
-  
+
   /**
    * Gets properties of a table namespace
    * 
@@ -437,7 +505,7 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
       return ServerClient.executeRaw(instance, new ClientExecReturn<Map<String,String>,ClientService.Client>() {
         @Override
         public Map<String,String> execute(ClientService.Client client) throws Exception {
-          return client.getTableNamespaceConfiguration(Tracer.traceInfo(), credentials, namespace);
+          return client.getTableNamespaceConfiguration(Tracer.traceInfo(), credentials.toThrift(instance), namespace);
         }
       }).entrySet();
     } catch (ThriftTableOperationException e) {
@@ -453,9 +521,9 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
     } catch (Exception e) {
       throw new AccumuloException(e);
     }
-    
+
   }
-  
+
   /**
    * 
    * @param namespace
@@ -468,7 +536,7 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
    */
   @Override
   public void offline(String namespace) throws AccumuloSecurityException, AccumuloException, TableNamespaceNotFoundException {
-    
+
     ArgumentChecker.notNull(namespace);
     String namespaceId = TableNamespaces.getNamespaceId(instance, namespace);
     try {
@@ -479,7 +547,7 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
       Log.error("Table namespace (" + namespaceId + ") contains reference to table that doesn't exist");
     }
   }
-  
+
   /**
    * 
    * @param namespace
@@ -502,7 +570,7 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
       Log.warn("Table namespace (" + namespaceId + ") contains a reference to a table that doesn't exist");
     }
   }
-  
+
   /**
    * Get a mapping of table namespace name to internal table namespace id.
    * 
@@ -512,7 +580,7 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
   public Map<String,String> namespaceIdMap() {
     return TableNamespaces.getNameToIdMap(instance);
   }
-  
+
   @Override
   public List<DiskUsage> getDiskUsage(String namespace) throws AccumuloException, AccumuloSecurityException, TableNamespaceNotFoundException {
     Set<String> tables = new HashSet<String>();
@@ -526,9 +594,9 @@ public class TableNamespaceOperationsImpl implements TableNamespaceOperations {
     }
     return du;
   }
-  
+
   private TableOperations getTableOperations() throws AccumuloException, AccumuloSecurityException {
     return new TableOperationsImpl(instance, credentials);
   }
-  
+
 }
