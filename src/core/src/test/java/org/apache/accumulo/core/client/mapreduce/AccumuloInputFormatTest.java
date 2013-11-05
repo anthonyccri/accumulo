@@ -48,9 +48,16 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 public class AccumuloInputFormatTest {
+  
+  @Before
+  public void setup() {
+    AccumuloInputFormat.resetCounters();
+    AccumuloOutputFormat.resetCounters();
+  }
   
   @After
   public void tearDown() throws Exception {}
@@ -100,7 +107,7 @@ public class AccumuloInputFormatTest {
     
     AccumuloInputFormat.setIterator(job, 1, "org.apache.accumulo.core.iterators.WholeRowIterator", "WholeRow");
     Configuration conf = job.getConfiguration();
-    String iterators = conf.get("AccumuloInputFormat.iterators");
+    String iterators = conf.get("AccumuloInputFormat.iterators." + InputFormatBase.DEFAULT_SEQUENCE);
     assertEquals("1:org.apache.accumulo.core.iterators.WholeRowIterator:WholeRow", iterators);
   }
   
@@ -163,7 +170,7 @@ public class AccumuloInputFormatTest {
     
     final String rawConfigOpt = new AccumuloIteratorOption("iterator", key, value).toString();
     
-    assertEquals(rawConfigOpt, job.getConfiguration().get("AccumuloInputFormat.iterators.options"));
+    assertEquals(rawConfigOpt, job.getConfiguration().get("AccumuloInputFormat.iterators.options." + InputFormatBase.DEFAULT_SEQUENCE));
     
     List<AccumuloIteratorOption> opts = AccumuloInputFormat.getIteratorOptions(job.getConfiguration());
     assertEquals(1, opts.size());
@@ -197,7 +204,7 @@ public class AccumuloInputFormatTest {
     List<AccumuloIterator> list = AccumuloInputFormat.getIterators(job);
     
     // Check the list size
-    assertTrue(list.size() == 3);
+    assertEquals(3, list.size());
     
     // Walk the list and make sure our settings are correct
     AccumuloIterator setting = list.get(0);
@@ -227,7 +234,7 @@ public class AccumuloInputFormatTest {
     AccumuloInputFormat.setIteratorOption(job, "someIterator", "aKey", "aValue");
     
     Configuration conf = job.getConfiguration();
-    String options = conf.get("AccumuloInputFormat.iterators.options");
+    String options = conf.get("AccumuloInputFormat.iterators.options." + InputFormatBase.DEFAULT_SEQUENCE);
     assertEquals(new String("someIterator:aKey:aValue"), options);
   }
   
@@ -385,5 +392,37 @@ public class AccumuloInputFormatTest {
     while (rr.nextKeyValue()) {
       Assert.assertTrue( p.matcher( rr.getCurrentKey().getRow().toString()).matches());
     }
+  }
+  
+  @Test
+  public void testMultipleConfigurations() throws Exception {
+    Configuration conf = new Configuration();
+    int seq1 = AccumuloInputFormat.nextSequence(), seq2 = AccumuloInputFormat.nextSequence();
+    
+    AccumuloInputFormat.setZooKeeperInstance(conf, seq1, "instance1", "zookeeper1");
+    AccumuloInputFormat.setInputInfo(conf, seq1, "user1", "password1".getBytes(), "table1", new Authorizations("1"));
+    
+    AccumuloInputFormat.setZooKeeperInstance(conf, seq2, "instance2", "zookeeper2");
+    AccumuloInputFormat.setInputInfo(conf, seq2, "user2", "password2".getBytes(), "table2", new Authorizations("2"));
+
+    String instance1 = conf.get(AccumuloInputFormat.class.getSimpleName() + ".instanceName." + seq1), 
+        zookeeper1 = conf.get(AccumuloInputFormat.class.getSimpleName() + ".zooKeepers." + seq1);
+    
+    assertEquals("instance1", instance1);
+    assertEquals("zookeeper1", zookeeper1);
+    assertEquals("user1", AccumuloInputFormat.getUsername(conf, seq1));
+    assertEquals("password1", new String(AccumuloInputFormat.getPassword(conf, seq1)));
+    assertEquals("table1", AccumuloInputFormat.getTablename(conf, seq1));
+    assertEquals(new Authorizations("1"), AccumuloInputFormat.getAuthorizations(conf, seq1));
+
+    String instance2 = conf.get(AccumuloInputFormat.class.getSimpleName() + ".instanceName." + seq2), 
+        zookeeper2 = conf.get(AccumuloInputFormat.class.getSimpleName() + ".zooKeepers." + seq2);
+    
+    assertEquals("instance2", instance2);
+    assertEquals("zookeeper2", zookeeper2);
+    assertEquals("user2", AccumuloInputFormat.getUsername(conf, seq2));
+    assertEquals("password2", new String(AccumuloInputFormat.getPassword(conf, seq2)));
+    assertEquals("table2", AccumuloInputFormat.getTablename(conf, seq2));
+    assertEquals(new Authorizations("2"), AccumuloInputFormat.getAuthorizations(conf, seq2));
   }
 }

@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 
 import org.apache.accumulo.core.client.BatchWriter;
 import org.apache.accumulo.core.client.Connector;
+import org.apache.accumulo.core.client.Instance;
 import org.apache.accumulo.core.client.Scanner;
 import org.apache.accumulo.core.client.mock.MockInstance;
 import org.apache.accumulo.core.data.Key;
@@ -42,6 +43,7 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -71,6 +73,12 @@ public class AccumuloOutputFormatTest {
         context.write(new Text(), m);
       } catch (NullPointerException e) {}
     }
+  }
+  
+  @Before
+  public void setup() {
+    AccumuloInputFormat.resetCounters();
+    AccumuloOutputFormat.resetCounters();
   }
   
   @Test
@@ -124,5 +132,36 @@ public class AccumuloOutputFormatTest {
     Entry<Key,Value> entry = iter.next();
     assertEquals(Integer.parseInt(new String(entry.getValue().get())), 100);
     assertFalse(iter.hasNext());
+  }
+  
+  @Test
+  public void testMultiInstanceConfiguration() throws Exception {
+    MockInstance mockInstance1 = new MockInstance("testinstance1"), mockInstance2 = new MockInstance("testinstance2");
+    
+    int seq1 = AccumuloOutputFormat.nextSequence(), seq2 = AccumuloOutputFormat.nextSequence();
+    
+    Configuration conf = new Configuration();
+    AccumuloOutputFormat.setOutputInfo(conf, seq1, "root1", "1".getBytes(), false, "testtable1");
+    AccumuloOutputFormat.setMockInstance(conf, seq1, "testinstance1");
+    
+    AccumuloOutputFormat.setOutputInfo(conf, seq2, "root2", "2".getBytes(), true, "testtable2");
+    AccumuloOutputFormat.setMockInstance(conf, seq2, "testinstance2");
+    
+    assertEquals("root1", AccumuloOutputFormat.getUsername(conf, seq1));
+    assertEquals("1", new String(AccumuloOutputFormat.getPassword(conf, seq1)));
+    assertEquals(false, AccumuloOutputFormat.canCreateTables(conf, seq1));
+    assertEquals("testtable1", AccumuloOutputFormat.getDefaultTableName(conf, seq1));
+    
+    Instance inst1 = AccumuloOutputFormat.getInstance(conf, seq1);
+    assertEquals("testinstance1", inst1.getInstanceName());
+    
+    assertEquals("root2", AccumuloOutputFormat.getUsername(conf, seq2));
+    assertEquals("2", new String(AccumuloOutputFormat.getPassword(conf, seq2)));
+    assertEquals(true, AccumuloOutputFormat.canCreateTables(conf, seq2));
+    assertEquals("testtable2", AccumuloOutputFormat.getDefaultTableName(conf, seq2));
+    
+    Instance inst2 = AccumuloOutputFormat.getInstance(conf, seq2);
+    assertEquals("testinstance2", inst2.getInstanceName());
+    
   }
 }
