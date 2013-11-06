@@ -19,6 +19,9 @@ package org.apache.accumulo.core.client.mapreduce;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.accumulo.core.client.AccumuloException;
@@ -110,6 +113,20 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   public static void resetCounters() {
     NUM_CONFIGURATIONS_LOADED.set(0);
     NUM_CONFIGURATIONS_PROCESSED.set(0);
+  }
+  
+  public static Map<String,String> getRelevantEntries(Configuration conf) {
+    ArgumentChecker.notNull(conf);
+    
+    HashMap<String,String> confEntries = new HashMap<String,String>();
+    for (Entry<String,String> entry : conf) {
+      final String key = entry.getKey();
+      if (0 == key.indexOf(PREFIX)) {
+        confEntries.put(key, entry.getValue());
+      }
+    }
+    
+    return confEntries;
   }
   
   /**
@@ -612,8 +629,10 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
     final Configuration conf = job.getConfiguration();
     
     if (0 == sequencesToCheck) {
+      log.debug("No configurations loaded, checking the default");
       checkConfiguration(conf, sequencesToCheck);
     } else {
+      log.debug(sequencesToCheck + " configurations loaded");
       for (int i = 1; i <= sequencesToCheck; i++) {
         checkConfiguration(conf, i);
       }
@@ -621,8 +640,9 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   private void checkConfiguration(Configuration conf, int sequence) throws IOException {
-    if (!conf.getBoolean(merge(OUTPUT_INFO_HAS_BEEN_SET, sequence), false))
+    if (!conf.getBoolean(merge(OUTPUT_INFO_HAS_BEEN_SET, sequence), false)) {
       throw new IOException("Output info for sequence " + sequence + " has not been set.");
+    }
     if (!conf.getBoolean(merge(INSTANCE_HAS_BEEN_SET, sequence), false))
       throw new IOException("Instance info for sequence " + sequence + " has not been set.");
     try {
