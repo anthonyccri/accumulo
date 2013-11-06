@@ -21,8 +21,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.accumulo.core.client.BatchWriter;
@@ -34,6 +36,7 @@ import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.security.Authorizations;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -43,7 +46,6 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
-import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -73,12 +75,6 @@ public class AccumuloOutputFormatTest {
         context.write(new Text(), m);
       } catch (NullPointerException e) {}
     }
-  }
-  
-  @Before
-  public void setup() {
-    AccumuloInputFormat.resetCounters();
-    AccumuloOutputFormat.resetCounters();
   }
   
   @Test
@@ -136,8 +132,6 @@ public class AccumuloOutputFormatTest {
   
   @Test
   public void testMultiInstanceConfiguration() throws Exception {
-    MockInstance mockInstance1 = new MockInstance("testinstance1"), mockInstance2 = new MockInstance("testinstance2");
-    
     int seq1 = AccumuloOutputFormat.nextSequence(), seq2 = AccumuloOutputFormat.nextSequence();
     
     Configuration conf = new Configuration();
@@ -162,6 +156,41 @@ public class AccumuloOutputFormatTest {
     
     Instance inst2 = AccumuloOutputFormat.getInstance(conf, seq2);
     assertEquals("testinstance2", inst2.getInstanceName());
+  }
+  
+  @Test
+  public void testConfigEntries() throws Exception {
+    Configuration conf = new Configuration();
+    int seq1 = AccumuloOutputFormat.nextSequence(), seq2 = AccumuloOutputFormat.nextSequence();
     
+    AccumuloOutputFormat.setOutputInfo(conf, seq1, "root1", "1".getBytes(), false, "testtable1");
+    AccumuloOutputFormat.setZooKeeperInstance(conf, seq1, "instance1", "zk1");
+    
+    AccumuloOutputFormat.setOutputInfo(conf, seq2, "root2", "2".getBytes(), true, "testtable2");
+    AccumuloOutputFormat.setZooKeeperInstance(conf, seq2, "instance2", "zk2");
+    
+    final String prefix = AccumuloOutputFormat.class.getSimpleName();
+    HashMap<String,String> expected = new HashMap<String,String>();
+    expected.put(prefix + ".username.1", "root1");
+    expected.put(prefix + ".password.1", new String(Base64.encodeBase64("1".getBytes())));
+    expected.put(prefix + ".createtables.1", "false");
+    expected.put(prefix + ".defaulttable.1", "testtable1");
+    expected.put(prefix + ".instanceName.1", "instance1");
+    expected.put(prefix + ".zooKeepers.1", "zk1");
+    expected.put(prefix + ".configured.1", "true");
+    expected.put(prefix + ".instanceConfigured.1", "true");
+
+    expected.put(prefix + ".username.2", "root2");
+    expected.put(prefix + ".password.2", new String(Base64.encodeBase64("2".getBytes())));
+    expected.put(prefix + ".createtables.2", "true");
+    expected.put(prefix + ".defaulttable.2", "testtable2");
+    expected.put(prefix + ".instanceName.2", "instance2");
+    expected.put(prefix + ".zooKeepers.2", "zk2");
+    expected.put(prefix + ".configured.2", "true");
+    expected.put(prefix + ".instanceConfigured.2", "true");
+    
+    Map<String,String> actual = AccumuloOutputFormat.getRelevantEntries(conf);
+    
+    assertEquals(expected, actual);
   }
 }

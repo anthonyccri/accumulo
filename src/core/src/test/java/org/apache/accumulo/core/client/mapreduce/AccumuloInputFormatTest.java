@@ -53,12 +53,6 @@ import org.junit.Test;
 
 public class AccumuloInputFormatTest {
   
-  @Before
-  public void setup() {
-    AccumuloInputFormat.resetCounters();
-    AccumuloOutputFormat.resetCounters();
-  }
-  
   @After
   public void tearDown() throws Exception {}
   
@@ -397,7 +391,7 @@ public class AccumuloInputFormatTest {
   @Test
   public void testMultipleConfigurations() throws Exception {
     Configuration conf = new Configuration();
-    int seq1 = AccumuloInputFormat.nextSequence(), seq2 = AccumuloInputFormat.nextSequence();
+    int seq1 = AccumuloInputFormat.nextSequence(conf), seq2 = AccumuloInputFormat.nextSequence(conf);
     
     AccumuloInputFormat.setZooKeeperInstance(conf, seq1, "instance1", "zookeeper1");
     AccumuloInputFormat.setInputInfo(conf, seq1, "user1", "password1".getBytes(), "table1", new Authorizations("1"));
