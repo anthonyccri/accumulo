@@ -132,9 +132,9 @@ public class AccumuloOutputFormatTest {
   
   @Test
   public void testMultiInstanceConfiguration() throws Exception {
-    int seq1 = AccumuloOutputFormat.nextSequence(), seq2 = AccumuloOutputFormat.nextSequence();
-    
     Configuration conf = new Configuration();
+    int seq1 = AccumuloOutputFormat.nextSequence(conf), seq2 = AccumuloOutputFormat.nextSequence(conf);
+    
     AccumuloOutputFormat.setOutputInfo(conf, seq1, "root1", "1".getBytes(), false, "testtable1");
     AccumuloOutputFormat.setMockInstance(conf, seq1, "testinstance1");
     
@@ -161,7 +161,7 @@ public class AccumuloOutputFormatTest {
   @Test
   public void testConfigEntries() throws Exception {
     Configuration conf = new Configuration();
-    int seq1 = AccumuloOutputFormat.nextSequence(), seq2 = AccumuloOutputFormat.nextSequence();
+    int seq1 = AccumuloOutputFormat.nextSequence(conf), seq2 = AccumuloOutputFormat.nextSequence(conf);
     
     AccumuloOutputFormat.setOutputInfo(conf, seq1, "root1", "1".getBytes(), false, "testtable1");
     AccumuloOutputFormat.setZooKeeperInstance(conf, seq1, "instance1", "zk1");
@@ -188,6 +188,8 @@ public class AccumuloOutputFormatTest {
     expected.put(prefix + ".zooKeepers.2", "zk2");
     expected.put(prefix + ".configured.2", "true");
     expected.put(prefix + ".instanceConfigured.2", "true");
+    
+    expected.put(prefix + ".configuredSeqs", "1,2");
     
     Map<String,String> actual = AccumuloOutputFormat.getRelevantEntries(conf);
     
