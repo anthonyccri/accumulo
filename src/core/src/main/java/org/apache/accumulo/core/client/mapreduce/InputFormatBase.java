@@ -229,9 +229,11 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
     // If we used the default sequence ID, add that into the list of configured sequences
     if (conf.getBoolean(DEFAULT_SEQ_USED, false)) {
       configuredSequences.add(DEFAULT_SEQUENCE);
-      for (String configuredSequence : configuredSequencesArray) {
-        configuredSequences.add(Integer.parseInt(configuredSequence));
-      }
+    }
+
+    // Add the rest of any sequences to our list
+    for (String configuredSequence : configuredSequencesArray) {
+      configuredSequences.add(Integer.parseInt(configuredSequence));
     }
     
     int lastParsedSeqIndex = configuredSequences.size() - 1;
