@@ -151,15 +151,14 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
   private static final String ITERATORS_DELIM = ",";
 
   private static final String SEQ_DELIM = ".";
-  protected static final int DEFAULT_SEQUENCE = 0;
   
-  private static final String COMMA = ",";
-  private static final String CONFIGURED_SEQUENCES = PREFIX + ".configuredsSeqs";
-  private static final String DEFAULT_SEQ_USED = PREFIX + ".defaultSequenceUsed";
-  private static final String PROCESSED_SEQUENCES = PREFIX + ".processedSeqs";
-  private static final String TRUE = "true";
 
   private static final String READ_OFFLINE = PREFIX + ".read.offline";
+
+  protected static String merge(String name, Integer sequence) {
+    return name + SEQ_DELIM + sequence;
+  }
+
 
   /**
    * Get a unique identifier for these configurations
@@ -167,108 +166,15 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @return A unique number to provide to future AccumuloInputFormat calls
    */
   public static synchronized int nextSequence(Configuration conf) {
-    String value = conf.get(CONFIGURED_SEQUENCES);
-    if (null == value) {
-      conf.set(CONFIGURED_SEQUENCES, "1");
-      return 1;
-    } else {
-      String[] splitValues = StringUtils.split(value, COMMA);
-      int newValue = Integer.parseInt(splitValues[splitValues.length-1]) + 1;
-      
-      conf.set(CONFIGURED_SEQUENCES, value + COMMA + newValue);
-      return newValue;
-    }
+    return SequencedFormatHelper.nextSequence(conf, PREFIX);
   }
   
-  /**
-   * Using the provided Configuration, return the next sequence number to process.
-   * @param conf A Configuration object used to store AccumuloInputFormat information into
-   * @return The next sequence number to process, -1 when finished.
-   * @throws NoSuchElementException
-   */
-  protected static synchronized int nextSequenceToProcess(Configuration conf) throws NoSuchElementException {
-    String[] processedConfs = conf.getStrings(PROCESSED_SEQUENCES);
-    
-    // We haven't set anything, so we need to find the first to return
-    if (null == processedConfs || 0 == processedConfs.length) {
-      // Check to see if the default sequence was used
-      boolean defaultSeqUsed = conf.getBoolean(DEFAULT_SEQ_USED, false);
-      
-      // If so, set that we're processing it and return the value of the default
-      if (defaultSeqUsed) {
-        conf.set(PROCESSED_SEQUENCES, Integer.toString(DEFAULT_SEQUENCE));
-        return DEFAULT_SEQUENCE;
-      }
-      
-      String[] loadedConfs = conf.getStrings(CONFIGURED_SEQUENCES);
-      
-      // There was *nothing* loaded, fail.
-      if (null == loadedConfs || 0 == loadedConfs.length) {
-        throw new NoSuchElementException("Sequence was requested to process but none exist to return");
-      }
-      
-      // We have loaded configuration(s), use the first
-      int firstLoaded = Integer.parseInt(loadedConfs[0]);
-      conf.setInt(PROCESSED_SEQUENCES, firstLoaded);
-      
-      return firstLoaded;
-    }
-    
-    // We've previously parsed some confs, need to find the next one to load
-    int lastProcessedSeq = Integer.valueOf(processedConfs[processedConfs.length - 1]);
-    String[] configuredSequencesArray = conf.getStrings(CONFIGURED_SEQUENCES);
-    
-    // We only have the default sequence, no specifics.
-    // Getting here, we already know that we processed that default
-    if (null == configuredSequencesArray) {
-      return -1;
-    }
-
-    List<Integer> configuredSequences = new ArrayList<Integer>(configuredSequencesArray.length + 1);
-    
-    // If we used the default sequence ID, add that into the list of configured sequences
-    if (conf.getBoolean(DEFAULT_SEQ_USED, false)) {
-      configuredSequences.add(DEFAULT_SEQUENCE);
-    }
-
-    // Add the rest of any sequences to our list
-    for (String configuredSequence : configuredSequencesArray) {
-      configuredSequences.add(Integer.parseInt(configuredSequence));
-    }
-    
-    int lastParsedSeqIndex = configuredSequences.size() - 1;
-    
-    // Find the next sequence number after the one we last processed
-    for (; lastParsedSeqIndex >= 0; lastParsedSeqIndex--) {
-      int lastLoadedValue = configuredSequences.get(lastParsedSeqIndex);
-      
-      if (lastLoadedValue == lastProcessedSeq) {
-        break;
-      }
-    }
-    
-    // We either had no sequences to match or we matched the last configured sequence
-    // Both of which are equivalent to no (more) sequences to process
-    if (-1 == lastParsedSeqIndex || lastParsedSeqIndex + 1 >= configuredSequences.size()) {
-      return -1;
-    }
-    
-    // Get the value of the sequence at that offset
-    int nextSequence = configuredSequences.get(lastParsedSeqIndex + 1);
-    conf.set(PROCESSED_SEQUENCES, conf.get(PROCESSED_SEQUENCES) + COMMA + nextSequence);
-    
-    return nextSequence;
+  protected static int nextSequenceToProcess(Configuration conf) {
+    return SequencedFormatHelper.nextSequenceToProcess(conf, PREFIX);
   }
   
   protected static void setDefaultSequenceUsed(Configuration conf) {
-    String value = conf.get(DEFAULT_SEQ_USED);
-    if (null == value || !TRUE.equals(value)) {
-      conf.setBoolean(DEFAULT_SEQ_USED, true);
-    }
-  }
-
-  protected static String merge(String name, Integer sequence) {
-    return name + SEQ_DELIM + sequence;
+    SequencedFormatHelper.setDefaultSequenceUsed(conf, PREFIX);
   }
   
   public static Map<String,String> getRelevantEntries(Configuration conf) {
@@ -302,7 +208,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setIsolated(Configuration conf, boolean enable) {
     setDefaultSequenceUsed(conf);
-    setIsolated(conf, DEFAULT_SEQUENCE, enable);
+    setIsolated(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, enable);
   }
 
   /**
@@ -334,7 +240,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setLocalIterators(Configuration conf, boolean enable) {
     setDefaultSequenceUsed(conf);
-    setLocalIterators(conf, DEFAULT_SEQUENCE, enable);
+    setLocalIterators(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, enable);
   }
 
   /**
@@ -372,7 +278,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setInputInfo(Configuration conf, String user, byte[] passwd, String table, Authorizations auths) {
     setDefaultSequenceUsed(conf);
-    setInputInfo(conf, DEFAULT_SEQUENCE, user, passwd, table, auths);
+    setInputInfo(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, user, passwd, table, auths);
   }
 
   /**
@@ -422,7 +328,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setZooKeeperInstance(Configuration conf, String instanceName, String zooKeepers) {
     setDefaultSequenceUsed(conf);
-    setZooKeeperInstance(conf, DEFAULT_SEQUENCE, instanceName, zooKeepers);
+    setZooKeeperInstance(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, instanceName, zooKeepers);
   }
 
   /**
@@ -463,7 +369,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setMockInstance(Configuration conf, String instanceName) {
     setDefaultSequenceUsed(conf);
-    setMockInstance(conf, DEFAULT_SEQUENCE, instanceName);
+    setMockInstance(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, instanceName);
   }
 
   /**
@@ -497,7 +403,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setRanges(Configuration conf, Collection<Range> ranges) {
     setDefaultSequenceUsed(conf);
-    setRanges(conf, DEFAULT_SEQUENCE, ranges);
+    setRanges(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, ranges);
   }
 
   /**
@@ -539,7 +445,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void disableAutoAdjustRanges(Configuration conf) {
     setDefaultSequenceUsed(conf);
-    disableAutoAdjustRanges(conf, DEFAULT_SEQUENCE);
+    disableAutoAdjustRanges(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -569,7 +475,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setRegex(JobContext job, RegexType type, String regex) {
     setDefaultSequenceUsed(job.getConfiguration());
-    setRegex(job, DEFAULT_SEQUENCE, type, regex);
+    setRegex(job, SequencedFormatHelper.DEFAULT_SEQUENCE, type, regex);
   }
 
   /**
@@ -626,7 +532,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setMaxVersions(Configuration conf, int maxVersions) throws IOException {
     setDefaultSequenceUsed(conf);
-    setMaxVersions(conf, DEFAULT_SEQUENCE, maxVersions);
+    setMaxVersions(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, maxVersions);
   }
 
   /**
@@ -675,7 +581,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
 
   public static void setScanOffline(Configuration conf, boolean scanOff) {
     setDefaultSequenceUsed(conf);
-    setScanOffline(conf, DEFAULT_SEQUENCE, scanOff);
+    setScanOffline(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, scanOff);
   }
 
   /**
@@ -727,7 +633,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void fetchColumns(Configuration conf, Collection<Pair<Text,Text>> columnFamilyColumnQualifierPairs) {
     setDefaultSequenceUsed(conf);
-    fetchColumns(conf, DEFAULT_SEQUENCE, columnFamilyColumnQualifierPairs);
+    fetchColumns(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, columnFamilyColumnQualifierPairs);
   }
 
   /**
@@ -771,7 +677,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setLogLevel(Configuration conf, Level level) {
     setDefaultSequenceUsed(conf);
-    setLogLevel(conf, DEFAULT_SEQUENCE, level);
+    setLogLevel(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, level);
   }
 
   /**
@@ -806,7 +712,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void addIterator(Configuration conf, IteratorSetting cfg) {
     setDefaultSequenceUsed(conf);
-    addIterator(conf, DEFAULT_SEQUENCE, cfg);
+    addIterator(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, cfg);
   }
 
   /**
@@ -866,7 +772,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setIterator(JobContext job, int priority, String iteratorClass, String iteratorName) {
     setDefaultSequenceUsed(job.getConfiguration());
-    setIterator(job, DEFAULT_SEQUENCE, priority, iteratorClass, iteratorName);
+    setIterator(job, SequencedFormatHelper.DEFAULT_SEQUENCE, priority, iteratorClass, iteratorName);
   }
 
   /**
@@ -916,7 +822,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   public static void setIteratorOption(JobContext job, String iteratorName, String key, String value) {
     setDefaultSequenceUsed(job.getConfiguration());
-    setIteratorOption(job, DEFAULT_SEQUENCE, iteratorName, key, value);
+    setIteratorOption(job, SequencedFormatHelper.DEFAULT_SEQUENCE, iteratorName, key, value);
   }
 
   /**
@@ -967,7 +873,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setIsolated(Configuration, boolean)
    */
   protected static boolean isIsolated(Configuration conf) {
-    return isIsolated(conf, DEFAULT_SEQUENCE);
+    return isIsolated(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -998,7 +904,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setLocalIterators(Configuration, boolean)
    */
   protected static boolean usesLocalIterators(Configuration conf) {
-    return usesLocalIterators(conf, DEFAULT_SEQUENCE);
+    return usesLocalIterators(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1029,7 +935,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setInputInfo(Configuration, String, byte[], String, Authorizations)
    */
   protected static String getUsername(Configuration conf) {
-    return getUsername(conf, DEFAULT_SEQUENCE);
+    return getUsername(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1064,7 +970,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setInputInfo(Configuration, String, byte[], String, Authorizations)
    */
   protected static byte[] getPassword(Configuration conf) {
-    return getPassword(conf, DEFAULT_SEQUENCE);
+    return getPassword(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1096,7 +1002,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setInputInfo(Configuration, String, byte[], String, Authorizations)
    */
   protected static String getTablename(Configuration conf) {
-    return getTablename(conf, DEFAULT_SEQUENCE);
+    return getTablename(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1127,7 +1033,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setInputInfo(Configuration, String, byte[], String, Authorizations)
    */
   protected static Authorizations getAuthorizations(Configuration conf) {
-    return getAuthorizations(conf, DEFAULT_SEQUENCE);
+    return getAuthorizations(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1160,7 +1066,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setMockInstance(Configuration, String)
    */
   protected static Instance getInstance(Configuration conf) {
-    return getInstance(conf, DEFAULT_SEQUENCE);
+    return getInstance(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1195,7 +1101,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    *           if the table name set on the configuration doesn't exist
    */
   protected static TabletLocator getTabletLocator(Configuration conf) throws TableNotFoundException {
-    return getTabletLocator(conf, DEFAULT_SEQUENCE);
+    return getTabletLocator(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1236,7 +1142,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setRanges(Configuration, Collection)
    */
   protected static List<Range> getRanges(Configuration conf) throws IOException {
-    return getRanges(conf, DEFAULT_SEQUENCE);
+    return getRanges(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1265,7 +1171,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setRegex(JobContext, RegexType, String)
    */
   protected static String getRegex(JobContext job, RegexType type) {
-    return getRegex(job, DEFAULT_SEQUENCE, type);
+    return getRegex(job, SequencedFormatHelper.DEFAULT_SEQUENCE, type);
   }
 
   /**
@@ -1317,7 +1223,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #fetchColumns(Configuration, Collection)
    */
   protected static Set<Pair<Text,Text>> getFetchedColumns(Configuration conf) {
-    return getFetchedColumns(conf, DEFAULT_SEQUENCE);
+    return getFetchedColumns(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1355,7 +1261,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #disableAutoAdjustRanges(Configuration)
    */
   protected static boolean getAutoAdjustRanges(Configuration conf) {
-    return getAutoAdjustRanges(conf, DEFAULT_SEQUENCE);
+    return getAutoAdjustRanges(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1386,7 +1292,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #setLogLevel(Configuration, Level)
    */
   protected static Level getLogLevel(Configuration conf) {
-    return getLogLevel(conf, DEFAULT_SEQUENCE);
+    return getLogLevel(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1421,7 +1327,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    *           if the configuration is improperly configured
    */
   protected static void validateOptions(Configuration conf) throws IOException {
-    validateOptions(conf, DEFAULT_SEQUENCE);
+    validateOptions(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   // InputFormat doesn't have the equivalent of OutputFormat's
@@ -1479,7 +1385,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   protected static int getMaxVersions(Configuration conf) {
     setDefaultSequenceUsed(conf);
-    return getMaxVersions(conf, DEFAULT_SEQUENCE);
+    return getMaxVersions(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1495,7 +1401,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
   }
 
   protected static boolean isOfflineScan(Configuration conf) {
-    return isOfflineScan(conf, DEFAULT_SEQUENCE);
+    return isOfflineScan(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   protected static boolean isOfflineScan(Configuration conf, int sequence) {
@@ -1520,7 +1426,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #addIterator(Configuration, IteratorSetting)
    */
   protected static List<AccumuloIterator> getIterators(Configuration conf) {
-    return getIterators(conf, DEFAULT_SEQUENCE);
+    return getIterators(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1565,7 +1471,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    * @see #addIterator(Configuration, IteratorSetting)
    */
   protected static List<AccumuloIteratorOption> getIteratorOptions(Configuration conf) {
-    return getIteratorOptions(conf, DEFAULT_SEQUENCE);
+    return getIteratorOptions(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
 
   /**
@@ -1635,7 +1541,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
      * @deprecated Use {@link #setupIterators(Configuration,Scanner)} instead
      */
     protected void setupIterators(TaskAttemptContext attempt, Scanner scanner) throws AccumuloException {
-      setupIterators(attempt.getConfiguration(), DEFAULT_SEQUENCE, scanner);
+      setupIterators(attempt.getConfiguration(), SequencedFormatHelper.DEFAULT_SEQUENCE, scanner);
     }
 
     /**
@@ -1667,7 +1573,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
      * @deprecated Use {@link #setupMaxVersions(Configuration,Scanner)} instead
      */
     protected void setupMaxVersions(TaskAttemptContext attempt, Scanner scanner) {
-      setupMaxVersions(attempt.getConfiguration(), DEFAULT_SEQUENCE, scanner);
+      setupMaxVersions(attempt.getConfiguration(), SequencedFormatHelper.DEFAULT_SEQUENCE, scanner);
     }
 
     /**
@@ -2046,7 +1952,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
     }
 
     RangeInputSplit(String table, Range range, String[] locations) {
-      this(table, range, locations, DEFAULT_SEQUENCE);
+      this(table, range, locations, SequencedFormatHelper.DEFAULT_SEQUENCE);
     }
 
     RangeInputSplit(String table, Range range, String[] locations, int sequence) {

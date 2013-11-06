@@ -48,7 +48,6 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
 public class AccumuloInputFormatTest {
@@ -101,7 +100,7 @@ public class AccumuloInputFormatTest {
     
     AccumuloInputFormat.setIterator(job, 1, "org.apache.accumulo.core.iterators.WholeRowIterator", "WholeRow");
     Configuration conf = job.getConfiguration();
-    String iterators = conf.get("AccumuloInputFormat.iterators." + InputFormatBase.DEFAULT_SEQUENCE);
+    String iterators = conf.get("AccumuloInputFormat.iterators." + SequencedFormatHelper.DEFAULT_SEQUENCE);
     assertEquals("1:org.apache.accumulo.core.iterators.WholeRowIterator:WholeRow", iterators);
   }
   
@@ -164,7 +163,7 @@ public class AccumuloInputFormatTest {
     
     final String rawConfigOpt = new AccumuloIteratorOption("iterator", key, value).toString();
     
-    assertEquals(rawConfigOpt, job.getConfiguration().get("AccumuloInputFormat.iterators.options." + InputFormatBase.DEFAULT_SEQUENCE));
+    assertEquals(rawConfigOpt, job.getConfiguration().get("AccumuloInputFormat.iterators.options." + SequencedFormatHelper.DEFAULT_SEQUENCE));
     
     List<AccumuloIteratorOption> opts = AccumuloInputFormat.getIteratorOptions(job.getConfiguration());
     assertEquals(1, opts.size());
@@ -228,7 +227,7 @@ public class AccumuloInputFormatTest {
     AccumuloInputFormat.setIteratorOption(job, "someIterator", "aKey", "aValue");
     
     Configuration conf = job.getConfiguration();
-    String options = conf.get("AccumuloInputFormat.iterators.options." + InputFormatBase.DEFAULT_SEQUENCE);
+    String options = conf.get("AccumuloInputFormat.iterators.options." + SequencedFormatHelper.DEFAULT_SEQUENCE);
     assertEquals(new String("someIterator:aKey:aValue"), options);
   }
   

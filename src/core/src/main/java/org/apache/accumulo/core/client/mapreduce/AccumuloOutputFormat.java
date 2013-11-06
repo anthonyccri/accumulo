@@ -96,14 +96,9 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   private static final int DEFAULT_MAX_LATENCY = 60 * 1000; // 1 minute
   private static final int DEFAULT_NUM_WRITE_THREADS = 2;
   
-  private static final int DEFAULT_SEQUENCE = 0;
   private static final String SEQ_DELIM = ".";
   
-  private static final String COMMA = ",";
   private static final String CONFIGURED_SEQUENCES = PREFIX + ".configuredSeqs";
-  private static final String DEFAULT_SEQ_USED = PREFIX + ".defaultSequenceUsed";
-  private static final String PROCESSED_SEQUENCES = PREFIX + ".processedSeqs";
-  private static final String TRUE = "true";
 
 
 
@@ -113,17 +108,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
    * @return A unique number to provide to future AccumuloInputFormat calls
    */
   public static synchronized int nextSequence(Configuration conf) {
-    String value = conf.get(CONFIGURED_SEQUENCES);
-    if (null == value) {
-      conf.set(CONFIGURED_SEQUENCES, "1");
-      return 1;
-    } else {
-      String[] splitValues = StringUtils.split(value, COMMA);
-      int newValue = Integer.parseInt(splitValues[splitValues.length-1]) + 1;
-      
-      conf.set(CONFIGURED_SEQUENCES, value + COMMA + newValue);
-      return newValue;
-    }
+    return SequencedFormatHelper.nextSequence(conf, PREFIX);
   }
   
   /**
@@ -133,84 +118,11 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
    * @throws NoSuchElementException
    */
   protected static synchronized int nextSequenceToProcess(Configuration conf) throws NoSuchElementException {
-    String[] processedConfs = conf.getStrings(PROCESSED_SEQUENCES);
-    
-    // We haven't set anything, so we need to find the first to return
-    if (null == processedConfs || 0 == processedConfs.length) {
-      // Check to see if the default sequence was used
-      boolean defaultSeqUsed = conf.getBoolean(DEFAULT_SEQ_USED, false);
-      
-      // If so, set that we're processing it and return the value of the default
-      if (defaultSeqUsed) {
-        conf.set(PROCESSED_SEQUENCES, Integer.toString(DEFAULT_SEQUENCE));
-        return DEFAULT_SEQUENCE;
-      }
-      
-      String[] loadedConfs = conf.getStrings(CONFIGURED_SEQUENCES);
-      
-      // There was *nothing* loaded, fail.
-      if (null == loadedConfs || 0 == loadedConfs.length) {
-        throw new NoSuchElementException("Sequence was requested to process but none exist to return");
-      }
-      
-      // We have loaded configuration(s), use the first
-      int firstLoaded = Integer.parseInt(loadedConfs[0]);
-      conf.setInt(PROCESSED_SEQUENCES, firstLoaded);
-      
-      return firstLoaded;
-    }
-    
-    // We've previously parsed some confs, need to find the next one to load
-    int lastProcessedSeq = Integer.valueOf(processedConfs[processedConfs.length - 1]);
-    String[] configuredSequencesArray = conf.getStrings(CONFIGURED_SEQUENCES);
-    
-    // We only have the default sequence, no specifics.
-    // Getting here, we already know that we processed that default
-    if (null == configuredSequencesArray) {
-      return -1;
-    }
-
-    List<Integer> configuredSequences = new ArrayList<Integer>(configuredSequencesArray.length + 1);
-    
-    // If we used the default sequence ID, add that into the list of configured sequences
-    if (conf.getBoolean(DEFAULT_SEQ_USED, false)) {
-      configuredSequences.add(DEFAULT_SEQUENCE);
-    }
-
-    // Add the rest of any sequences to our list
-    for (String configuredSequence : configuredSequencesArray) {
-      configuredSequences.add(Integer.parseInt(configuredSequence));
-    }
-    
-    int lastParsedSeqIndex = configuredSequences.size() - 1;
-    
-    // Find the next sequence number after the one we last processed
-    for (; lastParsedSeqIndex >= 0; lastParsedSeqIndex--) {
-      int lastLoadedValue = configuredSequences.get(lastParsedSeqIndex);
-      
-      if (lastLoadedValue == lastProcessedSeq) {
-        break;
-      }
-    }
-    
-    // We either had no sequences to match or we matched the last configured sequence
-    // Both of which are equivalent to no (more) sequences to process
-    if (-1 == lastParsedSeqIndex || lastParsedSeqIndex + 1 >= configuredSequences.size()) {
-      return -1;
-    }
-    
-    // Get the value of the sequence at that offset
-    int nextSequence = configuredSequences.get(lastParsedSeqIndex + 1);
-    conf.set(PROCESSED_SEQUENCES, conf.get(PROCESSED_SEQUENCES) + COMMA + nextSequence);
-    
-    return nextSequence;
+    return SequencedFormatHelper.nextSequenceToProcess(conf, PREFIX);
   }
   
   protected static void setDefaultSequenceUsed(Configuration conf) {
-    String value = conf.get(DEFAULT_SEQ_USED);
-    if (null == value || !TRUE.equals(value)) {
-      conf.setBoolean(DEFAULT_SEQ_USED, true);
-    }
+    SequencedFormatHelper.setDefaultSequenceUsed(conf, PREFIX);
   }
 
   protected static String merge(String name, Integer sequence) {
@@ -266,7 +178,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
    */
   public static void setOutputInfo(Configuration conf, String user, byte[] passwd, boolean createTables, String defaultTable) {
     setDefaultSequenceUsed(conf);
-    setOutputInfo(conf, DEFAULT_SEQUENCE, user, passwd, createTables, defaultTable);
+    setOutputInfo(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, user, passwd, createTables, defaultTable);
   }
   
   /**
@@ -306,7 +218,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   
   public static void setZooKeeperInstance(Configuration conf, String instanceName, String zooKeepers) {
     setDefaultSequenceUsed(conf);
-    setZooKeeperInstance(conf, DEFAULT_SEQUENCE, instanceName, zooKeepers);
+    setZooKeeperInstance(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, instanceName, zooKeepers);
   }
   
   public static void setZooKeeperInstance(Configuration conf, int sequence, String instanceName, String zooKeepers) {
@@ -329,7 +241,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   
   public static void setMockInstance(Configuration conf, String instanceName) {
     setDefaultSequenceUsed(conf);
-    setMockInstance(conf, DEFAULT_SEQUENCE, instanceName);
+    setMockInstance(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, instanceName);
   }
   
   public static void setMockInstance(Configuration conf, int sequence, String instanceName) {
@@ -347,7 +259,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   
   public static void setMaxMutationBufferSize(Configuration conf, long numberOfBytes) {
     setDefaultSequenceUsed(conf);
-    setMaxMutationBufferSize(conf, DEFAULT_SEQUENCE, numberOfBytes);
+    setMaxMutationBufferSize(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, numberOfBytes);
   }
   
   public static void setMaxMutationBufferSize(Configuration conf, int sequence, long numberOfBytes) {
@@ -363,7 +275,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   
   public static void setMaxLatency(Configuration conf, int numberOfMilliseconds) {
     setDefaultSequenceUsed(conf);
-    setMaxLatency(conf, DEFAULT_SEQUENCE, numberOfMilliseconds);
+    setMaxLatency(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, numberOfMilliseconds);
   }
   
   public static void setMaxLatency(Configuration conf, int sequence, int numberOfMilliseconds) {
@@ -379,7 +291,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   
   public static void setMaxWriteThreads(Configuration conf, int numberOfThreads) {
     setDefaultSequenceUsed(conf);
-    setMaxWriteThreads(conf, DEFAULT_SEQUENCE, numberOfThreads);
+    setMaxWriteThreads(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, numberOfThreads);
   }
   
   public static void setMaxWriteThreads(Configuration conf, int sequence, int numberOfThreads) {
@@ -395,7 +307,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   
   public static void setLogLevel(Configuration conf, Level level) {
     setDefaultSequenceUsed(conf);
-    setLogLevel(conf, DEFAULT_SEQUENCE, level);
+    setLogLevel(conf, SequencedFormatHelper.DEFAULT_SEQUENCE, level);
   }
   
   public static void setLogLevel(Configuration conf, int sequence, Level level) {
@@ -412,7 +324,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   
   public static void setSimulationMode(Configuration conf) {
     setDefaultSequenceUsed(conf);
-    setSimulationMode(conf, DEFAULT_SEQUENCE);
+    setSimulationMode(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   public static void setSimulationMode(Configuration conf, int sequence) {
@@ -427,7 +339,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   protected static String getUsername(Configuration conf) {
-    return getUsername(conf, DEFAULT_SEQUENCE);
+    return getUsername(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   protected static String getUsername(Configuration conf, int sequence) {
@@ -444,7 +356,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
     return getPassword(job.getConfiguration());
   }
   protected static byte[] getPassword(Configuration conf) {
-    return getPassword(conf, DEFAULT_SEQUENCE);
+    return getPassword(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   /**
@@ -463,7 +375,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   protected static boolean canCreateTables(Configuration conf) {
-    return canCreateTables(conf, DEFAULT_SEQUENCE);
+    return canCreateTables(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   protected static boolean canCreateTables(Configuration conf, int sequence) {
@@ -478,7 +390,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   protected static String getDefaultTableName(Configuration conf) {
-    return getDefaultTableName(conf, DEFAULT_SEQUENCE);
+    return getDefaultTableName(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   protected static String getDefaultTableName(Configuration conf, int sequence) {
@@ -493,7 +405,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   protected static Instance getInstance(Configuration conf) {
-    return getInstance(conf, DEFAULT_SEQUENCE);
+    return getInstance(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   protected static Instance getInstance(Configuration conf, int sequence) {
@@ -510,7 +422,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   protected static long getMaxMutationBufferSize(Configuration conf) {
-    return getMaxMutationBufferSize(conf, DEFAULT_SEQUENCE);
+    return getMaxMutationBufferSize(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   protected static long getMaxMutationBufferSize(Configuration conf, int sequence) {
@@ -525,7 +437,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   protected static int getMaxLatency(Configuration conf) {
-    return getMaxLatency(conf, DEFAULT_SEQUENCE);
+    return getMaxLatency(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   protected static int getMaxLatency(Configuration conf, int sequence) {
@@ -540,7 +452,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   protected static int getMaxWriteThreads(Configuration conf) {
-    return getMaxWriteThreads(conf, DEFAULT_SEQUENCE);
+    return getMaxWriteThreads(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   protected static int getMaxWriteThreads(Configuration conf, int sequence) {
@@ -555,7 +467,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   protected static Level getLogLevel(Configuration conf) {
-    return getLogLevel(conf, DEFAULT_SEQUENCE);
+    return getLogLevel(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   protected static Level getLogLevel(Configuration conf, int sequence) {
@@ -573,7 +485,7 @@ public class AccumuloOutputFormat extends OutputFormat<Text,Mutation> {
   }
   
   protected static boolean getSimulationMode(Configuration conf) {
-    return getSimulationMode(conf, DEFAULT_SEQUENCE);
+    return getSimulationMode(conf, SequencedFormatHelper.DEFAULT_SEQUENCE);
   }
   
   protected static boolean getSimulationMode(Configuration conf, int sequence) {
