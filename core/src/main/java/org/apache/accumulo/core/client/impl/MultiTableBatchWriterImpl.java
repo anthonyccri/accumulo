@@ -16,7 +16,9 @@
  */
 package org.apache.accumulo.core.client.impl;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
@@ -33,62 +35,97 @@ import org.apache.accumulo.core.security.thrift.TCredentials;
 import org.apache.accumulo.core.util.ArgumentChecker;
 import org.apache.log4j.Logger;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+
 public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
+  public static final long DEFAULT_CACHE_TIME = 60;
+  public static final TimeUnit DEFAULT_CACHE_TIME_UNIT = TimeUnit.SECONDS;
+  
   static final Logger log = Logger.getLogger(MultiTableBatchWriterImpl.class);
   private boolean closed;
-  
+
   private class TableBatchWriter implements BatchWriter {
-    
+
     private String table;
-    
+
     TableBatchWriter(String table) {
       this.table = table;
     }
-    
+
     @Override
     public void addMutation(Mutation m) throws MutationsRejectedException {
       ArgumentChecker.notNull(m);
       bw.addMutation(table, m);
     }
-    
+
     @Override
     public void addMutations(Iterable<Mutation> iterable) throws MutationsRejectedException {
       bw.addMutation(table, iterable.iterator());
     }
-    
+
     @Override
     public void close() {
       throw new UnsupportedOperationException("Must close all tables, can not close an individual table");
     }
-    
+
     @Override
     public void flush() {
       throw new UnsupportedOperationException("Must flush all tables, can not flush an individual table");
     }
-    
+
+  }
+
+  /**
+   * CacheLoader which will look up the internal table ID for a given table name.
+   */
+  private class TableNameToIdLoader extends CacheLoader<String,String> {
+
+    @Override
+    public String load(String tableName) throws Exception {
+      String tableId = Tables.getNameToIdMap(instance).get(tableName);
+
+      if (tableId == null)
+        throw new TableNotFoundException(tableId, tableName, null);
+
+      if (Tables.getTableState(instance, tableId) == TableState.OFFLINE)
+        throw new TableOfflineException(instance, tableId);
+      
+      return tableId;
+    }
+
+  }
+
+  private TabletServerBatchWriter bw;
+  private ConcurrentHashMap<String,BatchWriter> tableWriters;
+  private Instance instance;
+  private final LoadingCache<String,String> nameToIdCache;
+
+  public MultiTableBatchWriterImpl(Instance instance, TCredentials credentials, BatchWriterConfig config) {
+    this(instance, credentials, config, DEFAULT_CACHE_TIME, DEFAULT_CACHE_TIME_UNIT);
   }
   
-  private TabletServerBatchWriter bw;
-  private HashMap<String,BatchWriter> tableWriters;
-  private Instance instance;
-  
-  public MultiTableBatchWriterImpl(Instance instance, TCredentials credentials, BatchWriterConfig config) {
-    ArgumentChecker.notNull(instance, credentials);
+  public MultiTableBatchWriterImpl(Instance instance, TCredentials credentials, BatchWriterConfig config, long cacheTime, TimeUnit cacheTimeUnit) {
+    ArgumentChecker.notNull(instance, credentials, config, cacheTimeUnit);
     this.instance = instance;
     this.bw = new TabletServerBatchWriter(instance, credentials, config);
-    tableWriters = new HashMap<String,BatchWriter>();
+    tableWriters = new ConcurrentHashMap<String,BatchWriter>();
     this.closed = false;
+
+    nameToIdCache = CacheBuilder.newBuilder().expireAfterWrite(cacheTime, cacheTimeUnit).concurrencyLevel(8).maximumSize(64).initialCapacity(16)
+        .build(new TableNameToIdLoader());
   }
-  
+
   public boolean isClosed() {
     return this.closed;
   }
-  
+
   public void close() throws MutationsRejectedException {
     bw.close();
     this.closed = true;
   }
-  
+
   /**
    * Warning: do not rely upon finalize to close this class. Finalize is not guaranteed to be called.
    */
@@ -105,16 +142,41 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
     }
   }
   
+  /**
+   * Returns the table ID for the given table name.
+   * @param tableName The name of the table which to find the ID for
+   * @return The table ID, or null if the table name doesn't exist
+   */
+  private String getId(String tableName) throws TableNotFoundException {
+    try {
+      return nameToIdCache.get(tableName);
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      
+      if (null == cause) {
+        throw new RuntimeException(e);
+      }
+      
+      if (cause instanceof TableNotFoundException) {
+        
+        throw (TableNotFoundException) cause;
+      }
+      
+      if (cause instanceof TableOfflineException) {
+        throw (TableOfflineException) cause;
+      }
+      
+      log.error("Unexpected exception when fetching table id for " + tableName);
+      
+      throw new RuntimeException(e);
+    }
+  }
+
   @Override
-  public synchronized BatchWriter getBatchWriter(String tableName) throws AccumuloException, AccumuloSecurityException, TableNotFoundException {
+  public BatchWriter getBatchWriter(String tableName) throws AccumuloException, AccumuloSecurityException, TableNotFoundException {
     ArgumentChecker.notNull(tableName);
-    String tableId = Tables.getNameToIdMap(instance).get(tableName);
-    if (tableId == null)
-      throw new TableNotFoundException(tableId, tableName, null);
-    
-    if (Tables.getTableState(instance, tableId) == TableState.OFFLINE)
-      throw new TableOfflineException(instance, tableId);
-    
+    String tableId = getId(tableName);
+
     BatchWriter tbw = tableWriters.get(tableId);
     if (tbw == null) {
       tbw = new TableBatchWriter(tableId);
@@ -122,10 +184,10 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
     }
     return tbw;
   }
-  
+
   @Override
   public void flush() throws MutationsRejectedException {
     bw.flush();
   }
-  
+
 }
