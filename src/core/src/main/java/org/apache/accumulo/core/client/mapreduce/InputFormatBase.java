@@ -42,8 +42,8 @@ import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.StringTokenizer;
-
-import javax.servlet.jsp.jstl.core.Config;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.accumulo.core.Constants;
 import org.apache.accumulo.core.client.AccumuloException;
@@ -83,7 +83,6 @@ import org.apache.accumulo.core.util.Pair;
 import org.apache.accumulo.core.util.TextUtil;
 import org.apache.accumulo.core.util.UtilWaitThread;
 import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -151,15 +150,22 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
   private static final String ITERATORS_DELIM = ",";
 
   private static final String SEQ_DELIM = ".";
-  
 
   private static final String READ_OFFLINE = PREFIX + ".read.offline";
+  
+  private static final AtomicBoolean DEFAULT_SEQUENCE_READ = new AtomicBoolean(false);
+  private static final AtomicInteger SEQUENCES_READ = new AtomicInteger(0);
 
   protected static String merge(String name, Integer sequence) {
     return name + SEQ_DELIM + sequence;
   }
 
 
+  protected static void resetInternals() {
+    DEFAULT_SEQUENCE_READ.set(false);
+    SEQUENCES_READ.set(0);
+  }
+  
   /**
    * Get a unique identifier for these configurations
    * 
@@ -169,8 +175,25 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
     return SequencedFormatHelper.nextSequence(conf, PREFIX);
   }
   
-  protected static int nextSequenceToProcess(Configuration conf) {
-    return SequencedFormatHelper.nextSequenceToProcess(conf, PREFIX);
+  protected static synchronized int nextSequenceToProcess(Configuration conf) {
+    boolean isDefaultSequenceUsed = SequencedFormatHelper.isDefaultSequenceUsed(conf, PREFIX);
+    
+    if (isDefaultSequenceUsed && !DEFAULT_SEQUENCE_READ.get()) {
+      DEFAULT_SEQUENCE_READ.set(true);
+      return 0;
+    }
+    
+    Integer[] configuredSequences = SequencedFormatHelper.configuredSequences(conf, PREFIX);
+    
+    int sequenceOffset = SEQUENCES_READ.getAndAdd(1);    
+    
+    if (0 == configuredSequences.length && !isDefaultSequenceUsed) {
+      throw new NoSuchElementException();
+    } else if (sequenceOffset >= configuredSequences.length) {
+      return -1;
+    }
+    
+    return configuredSequences[sequenceOffset];
   }
   
   protected static void setDefaultSequenceUsed(Configuration conf) {
@@ -1791,6 +1814,9 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   @Override
   public List<InputSplit> getSplits(JobContext job) throws IOException {
+    // Disclaimer: the only reason this works as it does is because getSplits is 
+    // called serially by the JobClient before the job starts (one node, one thread).
+    // If it was called by multiple nodes, this approach would fail miserably.
     final Configuration conf = job.getConfiguration();
     final int sequence = nextSequenceToProcess(conf);
     

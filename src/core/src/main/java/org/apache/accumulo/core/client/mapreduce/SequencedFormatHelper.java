@@ -16,11 +16,11 @@ public class SequencedFormatHelper {
 
   private static final String COMMA = ",";
   private static final String TRUE = "true";
-  protected static final int DEFAULT_SEQUENCE = 0;
+  public static final int DEFAULT_SEQUENCE = 0;
 
-  private static final String DEFAULT_SEQ_USED = ".defaultSequenceUsed";
-  private static final String CONFIGURED_SEQUENCES = ".configuredSeqs";
-  private static final String PROCESSED_SEQUENCES = ".processedSeqs";
+  public static final String DEFAULT_SEQ_USED = ".defaultSequenceUsed";
+  public static final String CONFIGURED_SEQUENCES = ".configuredSeqs";
+  public static final String PROCESSED_SEQUENCES = ".processedSeqs";
 
   /**
    * Get a unique identifier for these configurations
@@ -44,15 +44,46 @@ public class SequencedFormatHelper {
       return newValue;
     }
   }
+  
+  /**
+   * Returns all configured sequences but not the default sequence
+   * @param conf
+   * @param prefix
+   * @return
+   */
+  public static Integer[] configuredSequences(Configuration conf, String prefix) {
+    ArgumentChecker.notNull(conf, prefix);
+    
+    final String configuredSequences = prefix + CONFIGURED_SEQUENCES;
+    String[] values = conf.getStrings(configuredSequences);
+    if (null == values) {
+      return new Integer[0];
+    }
+    
+    Integer[] intValues = new Integer[values.length];
+    for (int i = 0; i < values.length; i++) {
+      intValues[i] = Integer.parseInt(values[i]);
+    }
+    
+    return intValues;
+  }
 
+  protected static boolean isDefaultSequenceUsed(Configuration conf, String prefix) {
+    ArgumentChecker.notNull(conf, prefix);
+    
+    final String defaultSequenceUsedKey = prefix + DEFAULT_SEQ_USED;
+    
+    return conf.getBoolean(defaultSequenceUsedKey, false);
+  }
+  
   protected static void setDefaultSequenceUsed(Configuration conf, String prefix) {
     ArgumentChecker.notNull(conf, prefix);
 
-    final String configuredSequences = prefix + DEFAULT_SEQ_USED;
+    final String defaultSequenceUsedKey = prefix + DEFAULT_SEQ_USED;
 
-    String value = conf.get(configuredSequences);
+    String value = conf.get(defaultSequenceUsedKey);
     if (null == value || !TRUE.equals(value)) {
-      conf.setBoolean(configuredSequences, true);
+      conf.setBoolean(defaultSequenceUsedKey, true);
     }
   }
 

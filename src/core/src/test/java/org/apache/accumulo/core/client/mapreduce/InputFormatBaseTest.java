@@ -14,6 +14,7 @@ public class InputFormatBaseTest {
   
   @Before
   public void setup() {
+    InputFormatBase.resetInternals();
     conf = new Configuration();
   }
 

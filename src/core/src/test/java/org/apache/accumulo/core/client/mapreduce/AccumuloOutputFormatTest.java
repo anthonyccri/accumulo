@@ -46,6 +46,7 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -75,6 +76,11 @@ public class AccumuloOutputFormatTest {
         context.write(new Text(), m);
       } catch (NullPointerException e) {}
     }
+  }
+  
+  @Before
+  public void clearInputFormatState() {
+    InputFormatBase.resetInternals();
   }
   
   @Test
