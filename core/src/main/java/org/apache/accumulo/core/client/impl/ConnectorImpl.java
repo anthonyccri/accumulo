@@ -126,21 +126,9 @@ public class ConnectorImpl extends Connector {
         .setMaxLatency(maxLatency, TimeUnit.MILLISECONDS).setMaxWriteThreads(maxWriteThreads));
   }
   
-  @Deprecated
-  @Override
-  public MultiTableBatchWriter createMultiTableBatchWriter(long maxMemory, long maxLatency, int maxWriteThreads, long cacheTime, TimeUnit cacheTimeUnit) {
-    return new MultiTableBatchWriterImpl(instance, credentials, new BatchWriterConfig().setMaxMemory(maxMemory)
-        .setMaxLatency(maxLatency, TimeUnit.MILLISECONDS).setMaxWriteThreads(maxWriteThreads), cacheTime, cacheTimeUnit);
-  }
-  
   @Override
   public MultiTableBatchWriter createMultiTableBatchWriter(BatchWriterConfig config) {
     return new MultiTableBatchWriterImpl(instance, credentials, config);
-  }
-  
-  @Override
-  public MultiTableBatchWriter createMultiTableBatchWriter(BatchWriterConfig config, long timeToCache, TimeUnit timeUnit) {
-    return new MultiTableBatchWriterImpl(instance, credentials, config, timeToCache, timeUnit);
   }
   
   @Override

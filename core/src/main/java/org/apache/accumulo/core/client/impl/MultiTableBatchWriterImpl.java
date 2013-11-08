@@ -41,8 +41,8 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 
 public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
-  public static final long DEFAULT_CACHE_TIME = 60;
-  public static final TimeUnit DEFAULT_CACHE_TIME_UNIT = TimeUnit.SECONDS;
+  public static final long DEFAULT_CACHE_TIME = 200;
+  public static final TimeUnit DEFAULT_CACHE_TIME_UNIT = TimeUnit.MILLISECONDS;
   
   static final Logger log = Logger.getLogger(MultiTableBatchWriterImpl.class);
   private AtomicBoolean closed;

@@ -90,20 +90,9 @@ public class MockConnector extends Connector {
     return new MockMultiTableBatchWriter(acu);
   }
   
-  @Deprecated
-  @Override
-  public MultiTableBatchWriter createMultiTableBatchWriter(long maxMemory, long maxLatency, int maxWriteThreads, long cacheTime, TimeUnit cacheTimeUnit) {
-    return new MockMultiTableBatchWriter(acu);
-  }
-  
   @Override
   public MultiTableBatchWriter createMultiTableBatchWriter(BatchWriterConfig config) {
     return createMultiTableBatchWriter(config.getMaxMemory(), config.getMaxLatency(TimeUnit.MILLISECONDS), config.getMaxWriteThreads());
-  }
-  
-  @Override
-  public MultiTableBatchWriter createMultiTableBatchWriter(BatchWriterConfig config, long cacheTime, TimeUnit cacheTimeUnit) {
-    return createMultiTableBatchWriter(config.getMaxMemory(), config.getMaxLatency(TimeUnit.MILLISECONDS), config.getMaxWriteThreads(), cacheTime, cacheTimeUnit);
   }
   
   @Override

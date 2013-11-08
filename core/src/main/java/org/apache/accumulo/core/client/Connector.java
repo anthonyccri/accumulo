@@ -16,8 +16,6 @@
  */
 package org.apache.accumulo.core.client;
 
-import java.util.concurrent.TimeUnit;
-
 import org.apache.accumulo.core.client.admin.InstanceOperations;
 import org.apache.accumulo.core.client.admin.SecurityOperations;
 import org.apache.accumulo.core.client.admin.TableOperations;
@@ -148,32 +146,8 @@ public abstract class Connector {
   public abstract MultiTableBatchWriter createMultiTableBatchWriter(long maxMemory, long maxLatency, int maxWriteThreads);
   
   /**
-   * Factory method to create a Multi-Table BatchWriter connected to Accumulo. Multi-table batch writers can queue data for multiple tables, which is good for
-   * ingesting data into multiple tables from the same source. Caching of ZooKeeper table information defaults to {@link MultiTableBatchWriterImpl#DEFAULT_CACHE_TIME}
-   * and {@link MultiTableBatchWriterImpl#DEFAULT_CACHE_TIME_UNIT}
-   * 
-   * @param maxMemory
-   *          size in bytes of the maximum memory to batch before writing
-   * @param maxLatency
-   *          size in milliseconds; set to 0 or Long.MAX_VALUE to allow the maximum time to hold a batch before writing
-   * @param maxWriteThreads
-   *          the maximum number of threads to use for writing data to the tablet servers
-   * @param cacheTime
-   *          Duration of time to cache ZooKeeper table information
-   * @param cacheTimeUnit
-   *          Unit of time to apply to {@link cacheTime}
-   * 
-   * @return MultiTableBatchWriter object for configuring and writing data to
-   * @deprecated since 1.5.0; Use {@link #createMultiTableBatchWriter(BatchWriterConfig)} instead.
-   * @since 1.5.1
-   */
-  @Deprecated
-  public abstract MultiTableBatchWriter createMultiTableBatchWriter(long maxMemory, long maxLatency, int maxWriteThreads, long cacheTime, TimeUnit cacheTimeUnit);
-  
-  /**
    * Factory method to create a Multi-Table BatchWriter connected to Accumulo. Multi-table batch writers can queue data for multiple tables. Also data for
-   * multiple tables can be sent to a server in a single batch. Its an efficient way to ingest data into multiple tables from a single process. Caching
-   * of ZooKeeper table information defaults to {@link MultiTableBatchWriterImpl#DEFAULT_CACHE_TIME} and {@link MultiTableBatchWriterImpl#DEFAULT_CACHE_TIME_UNIT}
+   * multiple tables can be sent to a server in a single batch. Its an efficient way to ingest data into multiple tables from a single process.
    * 
    * @param config
    *          configuration used to create multi-table batch writer
@@ -182,22 +156,6 @@ public abstract class Connector {
    */
   
   public abstract MultiTableBatchWriter createMultiTableBatchWriter(BatchWriterConfig config);
-  
-  /**
-   * Factory method to create a Multi-Table BatchWriter connected to Accumulo. Multi-table batch writers can queue data for multiple tables. Also data for
-   * multiple tables can be sent to a server in a single batch. Its an efficient way to ingest data into multiple tables from a single process. This method
-   * also allows the user to provide parameters as to how long table information from ZooKeeper is cached.
-   * @param config
-   *          configuration used to create the multi-table batch writer
-   * @param cacheTime
-   *          Duration of time to cache ZooKeeper table information
-   * @param cacheTimeUnit
-   *          Unit of time to apply to {@link cacheTime}
-   * @return
-   * @since 1.5.1
-   */
-  public abstract MultiTableBatchWriter createMultiTableBatchWriter(BatchWriterConfig config, long cacheTime, TimeUnit cacheTimeUnit);
-  
   
   /**
    * Factory method to create a Scanner connected to Accumulo.
