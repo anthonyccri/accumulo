@@ -19,6 +19,7 @@ package org.apache.accumulo.core.client.impl;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
@@ -44,7 +45,7 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
   public static final TimeUnit DEFAULT_CACHE_TIME_UNIT = TimeUnit.SECONDS;
   
   static final Logger log = Logger.getLogger(MultiTableBatchWriterImpl.class);
-  private boolean closed;
+  private AtomicBoolean closed;
 
   private class TableBatchWriter implements BatchWriter {
 
@@ -111,19 +112,19 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
     this.instance = instance;
     this.bw = new TabletServerBatchWriter(instance, credentials, config);
     tableWriters = new ConcurrentHashMap<String,BatchWriter>();
-    this.closed = false;
+    this.closed = new AtomicBoolean(false);
 
     nameToIdCache = CacheBuilder.newBuilder().expireAfterWrite(cacheTime, cacheTimeUnit).concurrencyLevel(8).maximumSize(64).initialCapacity(16)
         .build(new TableNameToIdLoader());
   }
 
   public boolean isClosed() {
-    return this.closed;
+    return this.closed.get();
   }
 
   public void close() throws MutationsRejectedException {
     bw.close();
-    this.closed = true;
+    this.closed.set(true);
   }
 
   /**
@@ -131,7 +132,7 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
    */
   @Override
   protected void finalize() {
-    if (!closed) {
+    if (!closed.get()) {
       log.warn(MultiTableBatchWriterImpl.class.getSimpleName() + " not shutdown; did you forget to call close()?");
       try {
         close();
@@ -153,19 +154,15 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       
+      log.error("Unexpected exception when fetching table id for " + tableName);
+      
       if (null == cause) {
         throw new RuntimeException(e);
-      }
-      
-      if (cause instanceof TableNotFoundException) {
+      } else if (cause instanceof TableNotFoundException) {
         throw (TableNotFoundException) cause;
-      }
-      
-      if (cause instanceof TableOfflineException) {
+      } else if (cause instanceof TableOfflineException) {
         throw (TableOfflineException) cause;
       }
-      
-      log.error("Unexpected exception when fetching table id for " + tableName);
       
       throw new RuntimeException(e);
     }
