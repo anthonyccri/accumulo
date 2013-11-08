@@ -123,8 +123,8 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
   }
 
   public void close() throws MutationsRejectedException {
-    bw.close();
     this.closed.set(true);
+    bw.close();
   }
 
   /**
