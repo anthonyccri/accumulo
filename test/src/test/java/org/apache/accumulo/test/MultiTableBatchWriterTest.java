@@ -77,49 +77,55 @@ public class MultiTableBatchWriterTest {
 
     MultiTableBatchWriter mtbw = connector.createMultiTableBatchWriter(config, 60, TimeUnit.SECONDS);
 
-    final String table1 = "testTableRenameSameWriters_table1", table2 = "testTableRenameSameWriters_table2";
-    final String newTable1 = "testTableRenameSameWriters_newTable1", newTable2 = "testTableRenameSameWriters_newTable2";
+    try {
+      final String table1 = "testTableRenameSameWriters_table1", table2 = "testTableRenameSameWriters_table2";
+      final String newTable1 = "testTableRenameSameWriters_newTable1", newTable2 = "testTableRenameSameWriters_newTable2";
 
-    TableOperations tops = connector.tableOperations();
-    tops.create(table1);
-    tops.create(table2);
+      TableOperations tops = connector.tableOperations();
+      tops.create(table1);
+      tops.create(table2);
 
-    BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
+      BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
 
-    Mutation m1 = new Mutation("foo");
-    m1.put("col1", "", "val1");
-    m1.put("col2", "", "val2");
+      Mutation m1 = new Mutation("foo");
+      m1.put("col1", "", "val1");
+      m1.put("col2", "", "val2");
 
-    bw1.addMutation(m1);
-    bw2.addMutation(m1);
+      bw1.addMutation(m1);
+      bw2.addMutation(m1);
 
-    tops.rename(table1, newTable1);
-    tops.rename(table2, newTable2);
+      tops.rename(table1, newTable1);
+      tops.rename(table2, newTable2);
 
-    Mutation m2 = new Mutation("bar");
-    m2.put("col1", "", "val1");
-    m2.put("col2", "", "val2");
+      Mutation m2 = new Mutation("bar");
+      m2.put("col1", "", "val1");
+      m2.put("col2", "", "val2");
 
-    bw1.addMutation(m2);
-    bw2.addMutation(m2);
+      bw1.addMutation(m2);
+      bw2.addMutation(m2);
 
-    mtbw.close();
+      mtbw.close();
 
-    Map<Entry<String,String>,String> expectations = new HashMap<Entry<String,String>,String>();
-    expectations.put(Maps.immutableEntry("foo", "col1"), "val1");
-    expectations.put(Maps.immutableEntry("foo", "col2"), "val2");
-    expectations.put(Maps.immutableEntry("bar", "col1"), "val1");
-    expectations.put(Maps.immutableEntry("bar", "col2"), "val2");
+      Map<Entry<String,String>,String> expectations = new HashMap<Entry<String,String>,String>();
+      expectations.put(Maps.immutableEntry("foo", "col1"), "val1");
+      expectations.put(Maps.immutableEntry("foo", "col2"), "val2");
+      expectations.put(Maps.immutableEntry("bar", "col1"), "val1");
+      expectations.put(Maps.immutableEntry("bar", "col2"), "val2");
 
-    for (String table : Arrays.asList(newTable1, newTable2)) {
-      Scanner s = connector.createScanner(table, new Authorizations());
-      s.setRange(new Range());
-      Map<Entry<String,String>,String> actual = new HashMap<Entry<String,String>,String>();
-      for (Entry<Key,Value> entry : s) {
-        actual.put(Maps.immutableEntry(entry.getKey().getRow().toString(), entry.getKey().getColumnFamily().toString()), entry.getValue().toString());
+      for (String table : Arrays.asList(newTable1, newTable2)) {
+        Scanner s = connector.createScanner(table, new Authorizations());
+        s.setRange(new Range());
+        Map<Entry<String,String>,String> actual = new HashMap<Entry<String,String>,String>();
+        for (Entry<Key,Value> entry : s) {
+          actual.put(Maps.immutableEntry(entry.getKey().getRow().toString(), entry.getKey().getColumnFamily().toString()), entry.getValue().toString());
+        }
+
+        Assert.assertEquals("Differing results for " + table, expectations, actual);
       }
-
-      Assert.assertEquals("Differing results for " + table, expectations, actual);
+    } finally {
+      if (null != mtbw) {
+        mtbw.close();
+      }
     }
   }
 
@@ -132,53 +138,59 @@ public class MultiTableBatchWriterTest {
 
     MultiTableBatchWriter mtbw = connector.createMultiTableBatchWriter(config, 60, TimeUnit.MINUTES);
 
-    final String table1 = "testTableRenameNewWriters_table1", table2 = "testTableRenameNewWriters_table2";
-    final String newTable1 = "testTableRenameNewWriters_newTable1", newTable2 = "testTableRenameNewWriters_newTable2";
+    try {
+      final String table1 = "testTableRenameNewWriters_table1", table2 = "testTableRenameNewWriters_table2";
+      final String newTable1 = "testTableRenameNewWriters_newTable1", newTable2 = "testTableRenameNewWriters_newTable2";
 
-    TableOperations tops = connector.tableOperations();
-    tops.create(table1);
-    tops.create(table2);
+      TableOperations tops = connector.tableOperations();
+      tops.create(table1);
+      tops.create(table2);
 
-    BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
+      BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
 
-    Mutation m1 = new Mutation("foo");
-    m1.put("col1", "", "val1");
-    m1.put("col2", "", "val2");
+      Mutation m1 = new Mutation("foo");
+      m1.put("col1", "", "val1");
+      m1.put("col2", "", "val2");
 
-    bw1.addMutation(m1);
-    bw2.addMutation(m1);
+      bw1.addMutation(m1);
+      bw2.addMutation(m1);
 
-    tops.rename(table1, newTable1);
-    tops.rename(table2, newTable2);
+      tops.rename(table1, newTable1);
+      tops.rename(table2, newTable2);
 
-    // MTBW is still caching this name to the correct table
-    bw1 = mtbw.getBatchWriter(table1);
-    bw2 = mtbw.getBatchWriter(table2);
+      // MTBW is still caching this name to the correct table
+      bw1 = mtbw.getBatchWriter(table1);
+      bw2 = mtbw.getBatchWriter(table2);
 
-    Mutation m2 = new Mutation("bar");
-    m2.put("col1", "", "val1");
-    m2.put("col2", "", "val2");
+      Mutation m2 = new Mutation("bar");
+      m2.put("col1", "", "val1");
+      m2.put("col2", "", "val2");
 
-    bw1.addMutation(m2);
-    bw2.addMutation(m2);
+      bw1.addMutation(m2);
+      bw2.addMutation(m2);
 
-    mtbw.close();
+      mtbw.close();
 
-    Map<Entry<String,String>,String> expectations = new HashMap<Entry<String,String>,String>();
-    expectations.put(Maps.immutableEntry("foo", "col1"), "val1");
-    expectations.put(Maps.immutableEntry("foo", "col2"), "val2");
-    expectations.put(Maps.immutableEntry("bar", "col1"), "val1");
-    expectations.put(Maps.immutableEntry("bar", "col2"), "val2");
+      Map<Entry<String,String>,String> expectations = new HashMap<Entry<String,String>,String>();
+      expectations.put(Maps.immutableEntry("foo", "col1"), "val1");
+      expectations.put(Maps.immutableEntry("foo", "col2"), "val2");
+      expectations.put(Maps.immutableEntry("bar", "col1"), "val1");
+      expectations.put(Maps.immutableEntry("bar", "col2"), "val2");
 
-    for (String table : Arrays.asList(newTable1, newTable2)) {
-      Scanner s = connector.createScanner(table, new Authorizations());
-      s.setRange(new Range());
-      Map<Entry<String,String>,String> actual = new HashMap<Entry<String,String>,String>();
-      for (Entry<Key,Value> entry : s) {
-        actual.put(Maps.immutableEntry(entry.getKey().getRow().toString(), entry.getKey().getColumnFamily().toString()), entry.getValue().toString());
+      for (String table : Arrays.asList(newTable1, newTable2)) {
+        Scanner s = connector.createScanner(table, new Authorizations());
+        s.setRange(new Range());
+        Map<Entry<String,String>,String> actual = new HashMap<Entry<String,String>,String>();
+        for (Entry<Key,Value> entry : s) {
+          actual.put(Maps.immutableEntry(entry.getKey().getRow().toString(), entry.getKey().getColumnFamily().toString()), entry.getValue().toString());
+        }
+
+        Assert.assertEquals("Differing results for " + table, expectations, actual);
       }
-
-      Assert.assertEquals("Differing results for " + table, expectations, actual);
+    } finally {
+      if (null != mtbw) {
+        mtbw.close();
+      }
     }
   }
 
@@ -191,36 +203,42 @@ public class MultiTableBatchWriterTest {
 
     MultiTableBatchWriter mtbw = connector.createMultiTableBatchWriter(config, 0, TimeUnit.SECONDS);
 
-    final String table1 = "testTableRenameNewWritersNoCaching_table1", table2 = "testTableRenameNewWritersNoCaching_table2";
-    final String newTable1 = "testTableRenameNewWritersNoCaching_newTable1", newTable2 = "testTableRenameNewWritersNoCaching_newTable2";
-
-    TableOperations tops = connector.tableOperations();
-    tops.create(table1);
-    tops.create(table2);
-
-    BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
-
-    Mutation m1 = new Mutation("foo");
-    m1.put("col1", "", "val1");
-    m1.put("col2", "", "val2");
-
-    bw1.addMutation(m1);
-    bw2.addMutation(m1);
-
-    tops.rename(table1, newTable1);
-    tops.rename(table2, newTable2);
-
     try {
-      bw1 = mtbw.getBatchWriter(table1);
-      Assert.fail("Should not have gotten batchwriter for " + table1);
-    } catch (TableNotFoundException e) {
-      // Pass
-    }
+      final String table1 = "testTableRenameNewWritersNoCaching_table1", table2 = "testTableRenameNewWritersNoCaching_table2";
+      final String newTable1 = "testTableRenameNewWritersNoCaching_newTable1", newTable2 = "testTableRenameNewWritersNoCaching_newTable2";
 
-    try {
-      bw2 = mtbw.getBatchWriter(table2);
-    } catch (TableNotFoundException e) {
-      // Pass
+      TableOperations tops = connector.tableOperations();
+      tops.create(table1);
+      tops.create(table2);
+
+      BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
+
+      Mutation m1 = new Mutation("foo");
+      m1.put("col1", "", "val1");
+      m1.put("col2", "", "val2");
+
+      bw1.addMutation(m1);
+      bw2.addMutation(m1);
+
+      tops.rename(table1, newTable1);
+      tops.rename(table2, newTable2);
+
+      try {
+        bw1 = mtbw.getBatchWriter(table1);
+        Assert.fail("Should not have gotten batchwriter for " + table1);
+      } catch (TableNotFoundException e) {
+        // Pass
+      }
+
+      try {
+        bw2 = mtbw.getBatchWriter(table2);
+      } catch (TableNotFoundException e) {
+        // Pass
+      }
+    } finally {
+      if (null != mtbw) {
+        mtbw.close();
+      }
     }
   }
 
@@ -233,36 +251,42 @@ public class MultiTableBatchWriterTest {
 
     MultiTableBatchWriter mtbw = connector.createMultiTableBatchWriter(config, 60, TimeUnit.MINUTES);
 
-    final String table1 = "testTableDelete_table1", table2 = "testTableDelete_table2";
-
-    TableOperations tops = connector.tableOperations();
-    tops.create(table1);
-    tops.create(table2);
-
-    BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
-
-    Mutation m1 = new Mutation("foo");
-    m1.put("col1", "", "val1");
-    m1.put("col2", "", "val2");
-
-    bw1.addMutation(m1);
-    bw2.addMutation(m1);
-
-    tops.delete(table1);
-    tops.delete(table2);
-
-    Mutation m2 = new Mutation("bar");
-    m2.put("col1", "", "val1");
-    m2.put("col2", "", "val2");
-
-    bw1.addMutation(m2);
-    bw2.addMutation(m2);
-
     try {
-      mtbw.close();
-      Assert.fail("Should not be able to close batch writers");
-    } catch (MutationsRejectedException e) {
-      // Pass
+      final String table1 = "testTableDelete_table1", table2 = "testTableDelete_table2";
+
+      TableOperations tops = connector.tableOperations();
+      tops.create(table1);
+      tops.create(table2);
+
+      BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
+
+      Mutation m1 = new Mutation("foo");
+      m1.put("col1", "", "val1");
+      m1.put("col2", "", "val2");
+
+      bw1.addMutation(m1);
+      bw2.addMutation(m1);
+
+      tops.delete(table1);
+      tops.delete(table2);
+
+      Mutation m2 = new Mutation("bar");
+      m2.put("col1", "", "val1");
+      m2.put("col2", "", "val2");
+
+      bw1.addMutation(m2);
+      bw2.addMutation(m2);
+
+      try {
+        mtbw.close();
+        Assert.fail("Should not be able to close batch writers");
+      } catch (MutationsRejectedException e) {
+        // Pass
+      }
+    } finally {
+      if (null != mtbw) {
+        mtbw.close();
+      }
     }
   }
 
@@ -276,36 +300,43 @@ public class MultiTableBatchWriterTest {
 
     MultiTableBatchWriter mtbw = connector.createMultiTableBatchWriter(config, 60, TimeUnit.MINUTES);
 
-    final String table1 = "testOfflineTable_table1", table2 = "testOfflineTable_table2";
-
-    TableOperations tops = connector.tableOperations();
-    tops.create(table1);
-    tops.create(table2);
-
-    BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
-
-    Mutation m1 = new Mutation("foo");
-    m1.put("col1", "", "val1");
-    m1.put("col2", "", "val2");
-
-    bw1.addMutation(m1);
-    bw2.addMutation(m1);
-
-    tops.offline(table1);
-    tops.offline(table2);
-
-    Mutation m2 = new Mutation("bar");
-    m2.put("col1", "", "val1");
-    m2.put("col2", "", "val2");
-
-    bw1.addMutation(m2);
-    bw2.addMutation(m2);
-
     try {
-      mtbw.close();
-      Assert.fail("Should not be able to close batch writers");
-    } catch (MutationsRejectedException e) {
-      // Pass
+      final String table1 = "testOfflineTable_table1", table2 = "testOfflineTable_table2";
+
+      TableOperations tops = connector.tableOperations();
+      tops.create(table1);
+      tops.create(table2);
+
+      BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
+
+      Mutation m1 = new Mutation("foo");
+      m1.put("col1", "", "val1");
+      m1.put("col2", "", "val2");
+
+      bw1.addMutation(m1);
+      bw2.addMutation(m1);
+
+      tops.offline(table1);
+      tops.offline(table2);
+
+      Mutation m2 = new Mutation("bar");
+      m2.put("col1", "", "val1");
+      m2.put("col2", "", "val2");
+
+      bw1.addMutation(m2);
+      bw2.addMutation(m2);
+
+      try {
+        mtbw.close();
+        Assert.fail("Should not be able to close batch writers");
+      } catch (MutationsRejectedException e) {
+        // Pass
+      }
+    } finally {
+      if (null != mtbw) {
+        mtbw.close();
+      }
+
     }
   }
 
@@ -319,39 +350,45 @@ public class MultiTableBatchWriterTest {
 
     MultiTableBatchWriter mtbw = connector.createMultiTableBatchWriter(config, 60, TimeUnit.MINUTES);
 
-    final String table1 = "testOfflineTableWithCache_table1", table2 = "testOfflineTableWithCache_table2";
-
-    TableOperations tops = connector.tableOperations();
-    tops.create(table1);
-    tops.create(table2);
-
-    BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
-
-    Mutation m1 = new Mutation("foo");
-    m1.put("col1", "", "val1");
-    m1.put("col2", "", "val2");
-
-    bw1.addMutation(m1);
-    bw2.addMutation(m1);
-
-    tops.offline(table1);
-    tops.offline(table2);
-
-    bw1 = mtbw.getBatchWriter(table1);
-    bw2 = mtbw.getBatchWriter(table2);
-
-    Mutation m2 = new Mutation("bar");
-    m2.put("col1", "", "val1");
-    m2.put("col2", "", "val2");
-
-    bw1.addMutation(m2);
-    bw2.addMutation(m2);
-
     try {
-      mtbw.close();
-      Assert.fail("Should not be able to close batch writers");
-    } catch (MutationsRejectedException e) {
-      // Pass
+      final String table1 = "testOfflineTableWithCache_table1", table2 = "testOfflineTableWithCache_table2";
+
+      TableOperations tops = connector.tableOperations();
+      tops.create(table1);
+      tops.create(table2);
+
+      BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
+
+      Mutation m1 = new Mutation("foo");
+      m1.put("col1", "", "val1");
+      m1.put("col2", "", "val2");
+
+      bw1.addMutation(m1);
+      bw2.addMutation(m1);
+
+      tops.offline(table1);
+      tops.offline(table2);
+
+      bw1 = mtbw.getBatchWriter(table1);
+      bw2 = mtbw.getBatchWriter(table2);
+
+      Mutation m2 = new Mutation("bar");
+      m2.put("col1", "", "val1");
+      m2.put("col2", "", "val2");
+
+      bw1.addMutation(m2);
+      bw2.addMutation(m2);
+
+      try {
+        mtbw.close();
+        Assert.fail("Should not be able to close batch writers");
+      } catch (MutationsRejectedException e) {
+        // Pass
+      }
+    } finally {
+      if (null != mtbw) {
+        mtbw.close();
+      }
     }
   }
 
@@ -365,37 +402,47 @@ public class MultiTableBatchWriterTest {
 
     MultiTableBatchWriter mtbw = connector.createMultiTableBatchWriter(config, 0, TimeUnit.MINUTES);
 
-    final String table1 = "testOfflineTableWithoutCache_table1", table2 = "testOfflineTableWithoutCache_table2";
-
-    TableOperations tops = connector.tableOperations();
-    tops.create(table1);
-    tops.create(table2);
-
-    BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
-
-    Mutation m1 = new Mutation("foo");
-    m1.put("col1", "", "val1");
-    m1.put("col2", "", "val2");
-
-    bw1.addMutation(m1);
-    bw2.addMutation(m1);
-
-    tops.offline(table1);
-    tops.offline(table2);
-
     try {
-      bw1 = mtbw.getBatchWriter(table1);
-      Assert.fail(table1 + " should be offline");
-    } catch (UncheckedExecutionException e) {
-      Assert.assertEquals(TableOfflineException.class, e.getCause().getClass());
-    }
+      final String table1 = "testOfflineTableWithoutCache_table1", table2 = "testOfflineTableWithoutCache_table2";
 
-    try {
-      bw2 = mtbw.getBatchWriter(table2);
-      Assert.fail(table1 + " should be offline");
-    } catch (UncheckedExecutionException e) {
-      Assert.assertEquals(TableOfflineException.class, e.getCause().getClass());
+      TableOperations tops = connector.tableOperations();
+      tops.create(table1);
+      tops.create(table2);
+
+      BatchWriter bw1 = mtbw.getBatchWriter(table1), bw2 = mtbw.getBatchWriter(table2);
+
+      Mutation m1 = new Mutation("foo");
+      m1.put("col1", "", "val1");
+      m1.put("col2", "", "val2");
+
+      bw1.addMutation(m1);
+      bw2.addMutation(m1);
+
+      tops.offline(table1);
+      tops.offline(table2);
+
+      try {
+        bw1 = mtbw.getBatchWriter(table1);
+        Assert.fail(table1 + " should be offline");
+      } catch (UncheckedExecutionException e) {
+        Assert.assertEquals(TableOfflineException.class, e.getCause().getClass());
+      }
+
+      try {
+        bw2 = mtbw.getBatchWriter(table2);
+        Assert.fail(table1 + " should be offline");
+      } catch (UncheckedExecutionException e) {
+        Assert.assertEquals(TableOfflineException.class, e.getCause().getClass());
+      }
+    } finally {
+      if (null != mtbw) {
+        try {
+          mtbw.close();
+          Assert.fail("Expecting close on MTBW to fail due to offline tables");
+        } catch (MutationsRejectedException e) {
+          // Pass
+        }
+      }
     }
   }
-
 }
