@@ -158,7 +158,6 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
       }
       
       if (cause instanceof TableNotFoundException) {
-        
         throw (TableNotFoundException) cause;
       }
       
