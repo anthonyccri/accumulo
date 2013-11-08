@@ -161,11 +161,27 @@ public class MultiTableBatchWriterTest {
       bw2.addMutation(m1);
 
       tops.rename(table1, newTable1);
-      tops.rename(table2, newTable2);
 
-      // MTBW is still caching this name to the correct table
-      bw1 = mtbw.getBatchWriter(table1);
-      bw2 = mtbw.getBatchWriter(table2);
+      // MTBW is still caching this name to the correct table, but we should invalidate its cache
+      // after seeing the rename
+      try {
+        bw1 = mtbw.getBatchWriter(table1);
+        Assert.fail("Should not be able to find this table");
+      } catch (TableNotFoundException e) {
+        // pass
+      }
+
+      tops.rename(table2, newTable2);
+      
+      try {
+        bw2 = mtbw.getBatchWriter(table2);
+        Assert.fail("Should not be able to find this table");
+      } catch (TableNotFoundException e) {
+        //pass
+      }
+      
+      bw1 = mtbw.getBatchWriter(newTable1);
+      bw2 = mtbw.getBatchWriter(newTable2);
 
       Mutation m2 = new Mutation("bar");
       m2.put("col1", "", "val1");
@@ -284,15 +300,14 @@ public class MultiTableBatchWriterTest {
       bw1.addMutation(m2);
       bw2.addMutation(m2);
 
-      try {
-        mtbw.close();
-        Assert.fail("Should not be able to close batch writers");
-      } catch (MutationsRejectedException e) {
-        // Pass
-      }
     } finally {
       if (null != mtbw) {
-        mtbw.close();
+        try {
+          mtbw.close();
+          Assert.fail("Should not be able to close batch writers");
+        } catch (MutationsRejectedException e) {
+          // Pass
+        }
       }
     }
   }
@@ -333,16 +348,14 @@ public class MultiTableBatchWriterTest {
 
       bw1.addMutation(m2);
       bw2.addMutation(m2);
-
-      try {
-        mtbw.close();
-        Assert.fail("Should not be able to close batch writers");
-      } catch (MutationsRejectedException e) {
-        // Pass
-      }
     } finally {
       if (null != mtbw) {
-        mtbw.close();
+        try {
+          mtbw.close();
+          Assert.fail("Should not be able to close batch writers");
+        } catch (MutationsRejectedException e) {
+          // Pass
+        }
       }
 
     }
@@ -376,27 +389,28 @@ public class MultiTableBatchWriterTest {
       bw2.addMutation(m1);
 
       tops.offline(table1);
-      tops.offline(table2);
-
-      bw1 = mtbw.getBatchWriter(table1);
-      bw2 = mtbw.getBatchWriter(table2);
-
-      Mutation m2 = new Mutation("bar");
-      m2.put("col1", "", "val1");
-      m2.put("col2", "", "val2");
-
-      bw1.addMutation(m2);
-      bw2.addMutation(m2);
 
       try {
-        mtbw.close();
-        Assert.fail("Should not be able to close batch writers");
-      } catch (MutationsRejectedException e) {
-        // Pass
+        bw1 = mtbw.getBatchWriter(table1);
+      } catch (TableOfflineException e) {
+        // pass
+      }
+
+      tops.offline(table2);
+
+      try {
+        bw2 = mtbw.getBatchWriter(table2);
+      } catch (TableOfflineException e) {
+        // pass
       }
     } finally {
       if (null != mtbw) {
-        mtbw.close();
+        try {
+          mtbw.close();
+          Assert.fail("Expecting close on MTBW to fail due to offline tables");
+        } catch (MutationsRejectedException e) {
+          // Pass
+        }
       }
     }
   }
@@ -434,15 +448,15 @@ public class MultiTableBatchWriterTest {
       try {
         bw1 = mtbw.getBatchWriter(table1);
         Assert.fail(table1 + " should be offline");
-      } catch (UncheckedExecutionException e) {
-        Assert.assertEquals(TableOfflineException.class, e.getCause().getClass());
+      } catch (TableOfflineException e) {
+        // pass
       }
 
       try {
         bw2 = mtbw.getBatchWriter(table2);
         Assert.fail(table1 + " should be offline");
-      } catch (UncheckedExecutionException e) {
-        Assert.assertEquals(TableOfflineException.class, e.getCause().getClass());
+      } catch (TableOfflineException e) {
+        // pass
       }
     } finally {
       if (null != mtbw) {
