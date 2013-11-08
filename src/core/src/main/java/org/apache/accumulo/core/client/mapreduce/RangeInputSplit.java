@@ -20,8 +20,14 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Set;
 
+import org.apache.accumulo.core.client.Instance;
+import org.apache.accumulo.core.client.ZooKeeperInstance;
+import org.apache.accumulo.core.client.mapreduce.InputFormatBase.AccumuloIterator;
+import org.apache.accumulo.core.client.mapreduce.InputFormatBase.AccumuloIteratorOption;
+import org.apache.accumulo.core.client.mock.MockInstance;
 import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.PartialKey;
@@ -42,10 +48,12 @@ public class RangeInputSplit extends InputSplit implements Writable {
   private String table, instanceName, zooKeepers, username;
   private String rowRegex, colfamRegex, colqualRegex, valueRegex;
   private byte[] password;
-  private boolean offline = false, mockInstance = false, isolatedScan = false, localIterators = false;
-  private int maxVersions = 1;
+  private Boolean offline, mockInstance, isolatedScan, localIterators;
+  private Integer maxVersions;
   private Authorizations auths;
   private Set<Pair<Text,Text>> fetchedColumns;
+  private List<AccumuloIterator> iterators;
+  private List<AccumuloIteratorOption> options;
 
   public RangeInputSplit() {
     range = new Range();
@@ -133,12 +141,25 @@ public class RangeInputSplit extends InputSplit implements Writable {
     for (int i = 0; i < numLocs; ++i)
       locations[i] = in.readUTF();
     
-    isolatedScan = in.readBoolean();
-    offline = in.readBoolean();
-    localIterators = in.readBoolean();
-    mockInstance = in.readBoolean();
+    if (in.readBoolean()) {
+      isolatedScan = in.readBoolean();
+    }
     
-    maxVersions = in.readInt();
+    if (in.readBoolean()) {
+      offline = in.readBoolean();
+    }
+    
+    if (in.readBoolean()) {
+      localIterators = in.readBoolean();
+    }
+    
+    if (in.readBoolean()) {
+      mockInstance = in.readBoolean();
+    }
+    
+    if (in.readBoolean()) {
+      maxVersions = in.readInt();
+    }
     
     if (in.readBoolean()) {
       rowRegex = in.readUTF();
@@ -193,12 +214,30 @@ public class RangeInputSplit extends InputSplit implements Writable {
     for (int i = 0; i < locations.length; ++i)
       out.writeUTF(locations[i]);
     
-    out.writeBoolean(isIsolatedScan());
-    out.writeBoolean(isOffline());
-    out.writeBoolean(usesLocalIterators());
-    out.writeBoolean(isMockInstance());
+    out.writeBoolean(null != isolatedScan);
+    if (null != isolatedScan) {
+      out.writeBoolean(isolatedScan);
+    }
     
-    out.writeInt(getMaxVersions());
+    out.writeBoolean(null != offline);
+    if (null != offline) {
+      out.writeBoolean(offline);
+    }
+    
+    out.writeBoolean(null != localIterators);
+    if (null != localIterators) {
+      out.writeBoolean(localIterators);
+    }
+    
+    out.writeBoolean(null != mockInstance);
+    if (null != mockInstance) {
+      out.writeBoolean(mockInstance);
+    }
+    
+    out.writeBoolean(null != maxVersions);
+    if (null != maxVersions) {
+      out.writeInt(getMaxVersions());
+    }
     
     out.writeBoolean(null != rowRegex);
     if (null != rowRegex) {
@@ -261,6 +300,7 @@ public class RangeInputSplit extends InputSplit implements Writable {
     sb.append("Range: ").append(range);
     sb.append(" Locations: ").append(locations);
     sb.append(" Table: ").append(table);
+    // TODO finish building of string
     return sb.toString();
   }
 
@@ -270,6 +310,22 @@ public class RangeInputSplit extends InputSplit implements Writable {
 
   public void setTable(String table) {
     this.table = table;
+  }
+  
+  public Instance getInstance() {
+    if (null == instanceName) {
+      return null;
+    }
+    
+    if (isMockInstance()) {  
+      return new MockInstance(getInstanceName());
+    }
+    
+    if (null == zooKeepers) {
+      return null;
+    }
+    
+    return new ZooKeeperInstance(getInstanceName(), getZooKeepers());
   }
 
   public String getInstanceName() {
@@ -304,11 +360,11 @@ public class RangeInputSplit extends InputSplit implements Writable {
     this.password = password;
   }
 
-  public boolean isOffline() {
+  public Boolean isOffline() {
     return offline;
   }
 
-  public void setOffline(boolean offline) {
+  public void setOffline(Boolean offline) {
     this.offline = offline;
   }
 
@@ -348,27 +404,27 @@ public class RangeInputSplit extends InputSplit implements Writable {
     this.valueRegex = valueRegex;
   }
 
-  public boolean isMockInstance() {
+  public Boolean isMockInstance() {
     return mockInstance;
   }
 
-  public void setMockInstance(boolean mockInstance) {
+  public void setMockInstance(Boolean mockInstance) {
     this.mockInstance = mockInstance;
   }
 
-  public boolean isIsolatedScan() {
+  public Boolean isIsolatedScan() {
     return isolatedScan;
   }
 
-  public void setIsolatedScan(boolean isolatedScan) {
+  public void setIsolatedScan(Boolean isolatedScan) {
     this.isolatedScan = isolatedScan;
   }
 
-  public int getMaxVersions() {
+  public Integer getMaxVersions() {
     return maxVersions;
   }
 
-  public void setMaxVersions(int maxVersions) {
+  public void setMaxVersions(Integer maxVersions) {
     this.maxVersions = maxVersions;
   }
 
@@ -384,11 +440,11 @@ public class RangeInputSplit extends InputSplit implements Writable {
     this.range = range;
   }
 
-  public boolean usesLocalIterators() {
+  public Boolean usesLocalIterators() {
     return localIterators;
   }
 
-  public void setUsesLocalIterators(boolean localIterators) {
+  public void setUsesLocalIterators(Boolean localIterators) {
     this.localIterators = localIterators;
   }
 
@@ -398,5 +454,21 @@ public class RangeInputSplit extends InputSplit implements Writable {
 
   public void setFetchedColumns(Set<Pair<Text,Text>> fetchedColumns) {
     this.fetchedColumns = fetchedColumns;
+  }
+
+  public List<AccumuloIterator> getIterators() {
+    return iterators;
+  }
+
+  public void setIterators(List<AccumuloIterator> iterators) {
+    this.iterators = iterators;
+  }
+
+  public List<AccumuloIteratorOption> getOptions() {
+    return options;
+  }
+
+  public void setOptions(List<AccumuloIteratorOption> options) {
+    this.options = options;
   }
 }

@@ -826,17 +826,17 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
    */
   protected static Set<Pair<Text,Text>> getFetchedColumns(Configuration conf) {
     ArgumentChecker.notNull(conf);
-    
+
     return deserializeFetchedColumns(conf.getStrings(COLUMNS));
   }
 
   public static Set<Pair<Text,Text>> deserializeFetchedColumns(String[] serialized) {
     Set<Pair<Text,Text>> columns = new HashSet<Pair<Text,Text>>();
-    
+
     if (null == serialized) {
       return columns;
     }
-    
+
     for (String col : serialized) {
       int idx = col.indexOf(":");
       Text cf = new Text(idx < 0 ? Base64.decodeBase64(col.getBytes()) : Base64.decodeBase64(col.substring(0, idx).getBytes()));
@@ -1061,8 +1061,9 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
     /**
      * @deprecated Use {@link #setupIterators(Configuration,Scanner)} instead
      */
-    protected void setupIterators(TaskAttemptContext attempt, Scanner scanner) throws AccumuloException {
-      setupIterators(attempt.getConfiguration(), scanner);
+    protected void setupIterators(TaskAttemptContext attempt, Scanner scanner, List<AccumuloIterator> iterators, List<AccumuloIteratorOption> options)
+        throws AccumuloException {
+      setupIterators(attempt.getConfiguration(), scanner, iterators, options);
     }
 
     /**
@@ -1074,9 +1075,8 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
      *          the scanner to configure
      * @throws AccumuloException
      */
-    protected void setupIterators(Configuration conf, Scanner scanner) throws AccumuloException {
-      List<AccumuloIterator> iterators = getIterators(conf);
-      List<AccumuloIteratorOption> options = getIteratorOptions(conf);
+    protected void setupIterators(Configuration conf, Scanner scanner, List<AccumuloIterator> iterators, List<AccumuloIteratorOption> options)
+        throws AccumuloException {
 
       Map<String,IteratorSetting> scanIterators = new HashMap<String,IteratorSetting>();
       for (AccumuloIterator iterator : iterators) {
@@ -1093,8 +1093,8 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
     /**
      * @deprecated Use {@link #setupMaxVersions(Configuration,Scanner)} instead
      */
-    protected void setupMaxVersions(TaskAttemptContext attempt, Scanner scanner) {
-      setupMaxVersions(attempt.getConfiguration(), scanner);
+    protected void setupMaxVersions(TaskAttemptContext attempt, Scanner scanner, int maxVersions) {
+      setupMaxVersions(attempt.getConfiguration(), scanner, maxVersions);
     }
 
     /**
@@ -1105,8 +1105,7 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
      * @param scanner
      *          the scanner to configure
      */
-    protected void setupMaxVersions(Configuration conf, Scanner scanner) {
-      int maxVersions = getMaxVersions(conf);
+    protected void setupMaxVersions(Configuration conf, Scanner scanner, int maxVersions) {
       // Check to make sure its a legit value
       if (maxVersions >= 1) {
         IteratorSetting vers = new IteratorSetting(0, "vers", VersioningIterator.class);
@@ -1123,43 +1122,119 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
       split = (RangeInputSplit) inSplit;
       log.debug("Initializing input split: " + split.getRange());
       Configuration conf = attempt.getConfiguration();
-      Instance instance = getInstance(conf);
-      String user = getUsername(conf);
-      byte[] password = getPassword(conf);
-      Authorizations authorizations = getAuthorizations(conf);
+
+      Instance instance = split.getInstance();
+      if (null == instance) {
+        instance = getInstance(conf);
+      }
+
+      String user = split.getUsername();
+      if (null == user) {
+        user = getUsername(conf);
+      }
+
+      byte[] password = split.getPassword();
+      if (null == password) {
+        password = getPassword(conf);
+      }
+
+      Authorizations authorizations = split.getAuths();
+      if (null == authorizations) {
+        authorizations = getAuthorizations(conf);
+      }
+
+      String table = split.getTable();
+      if (null == table) {
+        table = getTablename(conf);
+      }
+      
+      Boolean isOffline = split.isOffline();
+      if (null == isOffline) {
+        isOffline = isOfflineScan(conf);
+      }
+
+      Boolean isIsolated = split.isIsolatedScan();
+      if (null == isIsolated) {
+        isIsolated = isIsolated(conf);
+      }
+
+      Boolean usesLocalIterators = split.usesLocalIterators();
+      if (null == usesLocalIterators) {
+        usesLocalIterators = usesLocalIterators(conf);
+      }
+
+      String rowRegex = split.getRowRegex();
+      if (null == rowRegex) {
+        rowRegex = conf.get(ROW_REGEX);
+      }
+
+      String colfRegex = split.getColfamRegex();
+      if (null == colfRegex) {
+        colfRegex = conf.get(COLUMN_FAMILY_REGEX);
+      }
+
+      String colqRegex = split.getColqualRegex();
+      if (null == colqRegex) {
+        colqRegex = conf.get(COLUMN_QUALIFIER_REGEX);
+      }
+
+      String valueRegex = split.getValueRegex();
+      if (null == valueRegex) {
+        valueRegex = conf.get(VALUE_REGEX);
+      }
+
+      Integer maxVersions = split.getMaxVersions();
+      if (null == maxVersions) {
+        maxVersions = getMaxVersions(conf);
+      }
+      
+      List<AccumuloIterator> iterators = split.getIterators();
+      if (null == iterators) {
+        iterators = getIterators(conf);
+      }
+      
+      List<AccumuloIteratorOption> options = split.getOptions();
+      if (null == options) {
+        options = getIteratorOptions(conf);
+      }
+      
+      Set<Pair<Text,Text>> columns = split.getFetchedColumns();
+      if (null == columns) {
+        columns = getFetchedColumns(conf);
+      }
 
       try {
         log.debug("Creating connector with user: " + user);
         Connector conn = instance.getConnector(user, password);
-        log.debug("Creating scanner for table: " + getTablename(conf));
+        log.debug("Creating scanner for table: " + table);
         log.debug("Authorizations are: " + authorizations);
-        if (isOfflineScan(conf)) {
-          scanner = new OfflineScanner(instance, new AuthInfo(user, ByteBuffer.wrap(password), instance.getInstanceID()), Tables.getTableId(instance,
-              getTablename(conf)), authorizations);
+        if (isOffline) {
+          scanner = new OfflineScanner(instance, new AuthInfo(user, ByteBuffer.wrap(password), instance.getInstanceID()), Tables.getTableId(instance, table),
+              authorizations);
         } else {
-          scanner = conn.createScanner(getTablename(conf), authorizations);
+          scanner = conn.createScanner(table, authorizations);
         }
-        if (isIsolated(conf)) {
+        if (isIsolated) {
           log.info("Creating isolated scanner");
           scanner = new IsolatedScanner(scanner);
         }
-        if (usesLocalIterators(conf)) {
+        if (usesLocalIterators) {
           log.info("Using local iterators");
           scanner = new ClientSideIteratorScanner(scanner);
         }
-        setupMaxVersions(conf, scanner);
-        if (conf.get(ROW_REGEX) != null || conf.get(COLUMN_FAMILY_REGEX) != null || conf.get(COLUMN_QUALIFIER_REGEX) != null || conf.get(VALUE_REGEX) != null) {
+        setupMaxVersions(conf, scanner, maxVersions);
+        if (rowRegex != null || colfRegex != null || colqRegex != null || valueRegex != null) {
           IteratorSetting is = new IteratorSetting(50, RegExFilter.class);
-          RegExFilter.setRegexs(is, conf.get(ROW_REGEX), conf.get(COLUMN_FAMILY_REGEX), conf.get(COLUMN_QUALIFIER_REGEX), conf.get(VALUE_REGEX), false);
+          RegExFilter.setRegexs(is, rowRegex, colfRegex, colqRegex, valueRegex, false);
           scanner.addScanIterator(is);
         }
-        setupIterators(conf, scanner);
+        setupIterators(conf, scanner, iterators, options);
       } catch (Exception e) {
         throw new IOException(e);
       }
 
       // setup a scanner within the bounds of this split
-      for (Pair<Text,Text> c : getFetchedColumns(conf)) {
+      for (Pair<Text,Text> c : columns) {
         if (c.getSecond() != null) {
           log.debug("Fetching column " + c.getFirst() + ":" + c.getSecond());
           scanner.fetchColumn(c.getFirst(), c.getSecond());
@@ -1318,14 +1393,15 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
     boolean localIterators = usesLocalIterators(conf);
     boolean mockInstance = conf.getBoolean(MOCK, false);
     int maxVersions = getMaxVersions(conf);
-    String rowRegex = conf.get(ROW_REGEX), colfamRegex = conf.get(COLUMN_FAMILY_REGEX), colqualRegex = conf.get(COLUMN_QUALIFIER_REGEX), 
-        valueRegex = conf.get(VALUE_REGEX);
+    String rowRegex = conf.get(ROW_REGEX), colfamRegex = conf.get(COLUMN_FAMILY_REGEX), colqualRegex = conf.get(COLUMN_QUALIFIER_REGEX), valueRegex = conf
+        .get(VALUE_REGEX);
     Set<Pair<Text,Text>> fetchedColumns = getFetchedColumns(conf);
     Authorizations auths = getAuthorizations(conf);
     byte[] password = getPassword(conf);
     String username = getUsername(conf);
     Instance instance = getInstance(conf);
-        
+    List<AccumuloIterator> iterators = getIterators(conf);
+    List<AccumuloIteratorOption> options = getIteratorOptions(conf);
 
     if (ranges.isEmpty()) {
       ranges = new ArrayList<Range>(1);
@@ -1426,6 +1502,8 @@ public abstract class InputFormatBase<K,V> extends InputFormat<K,V> {
       split.setInstanceName(instance.getInstanceName());
       split.setZooKeepers(instance.getZooKeepers());
       split.setAuths(auths);
+      split.setIterators(iterators);
+      split.setOptions(options);
     }
 
     return splits;
