@@ -52,6 +52,11 @@ public class RangeInputSplit extends InputSplit implements Writable {
     locations = new String[0];
   }
 
+  public RangeInputSplit(Range range, String[] locations) {
+    this.range = range;
+    this.locations = locations;
+  }
+
   public Range getRange() {
     return range;
   }
@@ -93,11 +98,6 @@ public class RangeInputSplit extends InputSplit implements Writable {
     }
     // if we can't figure it out, then claim no progress
     return 0f;
-  }
-
-  public RangeInputSplit(Range range, String[] locations) {
-    this.range = range;
-    this.locations = locations;
   }
 
   /**
