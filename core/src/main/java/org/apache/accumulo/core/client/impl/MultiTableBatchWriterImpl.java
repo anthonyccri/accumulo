@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
@@ -48,7 +48,7 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
   
   static final Logger log = Logger.getLogger(MultiTableBatchWriterImpl.class);
   private AtomicBoolean closed;
-  private AtomicInteger cacheLastState;
+  private AtomicLong cacheLastState;
 
   private class TableBatchWriter implements BatchWriter {
 
@@ -116,7 +116,7 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
     this.bw = new TabletServerBatchWriter(instance, credentials, config);
     tableWriters = new ConcurrentHashMap<String,BatchWriter>();
     this.closed = new AtomicBoolean(false);
-    this.cacheLastState = new AtomicInteger(0);
+    this.cacheLastState = new AtomicLong(0);
 
     nameToIdCache = CacheBuilder.newBuilder().expireAfterWrite(cacheTime, cacheTimeUnit).concurrencyLevel(8).maximumSize(64).initialCapacity(16)
         .build(new TableNameToIdLoader());
@@ -190,8 +190,8 @@ public class MultiTableBatchWriterImpl implements MultiTableBatchWriter {
   public BatchWriter getBatchWriter(String tableName) throws AccumuloException, AccumuloSecurityException, TableNotFoundException {
     ArgumentChecker.notNull(tableName);
     
-    int cacheResetCount = Tables.getCacheResetCount();
-    int internalResetCount = cacheLastState.get();
+    long cacheResetCount = Tables.getCacheResetCount();
+    long internalResetCount = cacheLastState.get();
     
     if (cacheResetCount > internalResetCount) {
       cacheLastState.set(cacheResetCount);

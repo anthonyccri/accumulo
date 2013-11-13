@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.accumulo.core.Constants;
 import org.apache.accumulo.core.client.Instance;
@@ -32,7 +32,7 @@ import org.apache.accumulo.fate.zookeeper.ZooCache;
 
 public class Tables {
   private static SecurityPermission TABLES_PERMISSION = new SecurityPermission("tablesPermission");
-  private static AtomicInteger cacheResetCount = new AtomicInteger(0);
+  private static AtomicLong cacheResetCount = new AtomicLong(0);
   
   private static ZooCache getZooCache(Instance instance) {
     SecurityManager sm = System.getSecurityManager();
@@ -115,7 +115,7 @@ public class Tables {
     return TableState.valueOf(new String(state));
   }
   
-  public static int getCacheResetCount() {
+  public static long getCacheResetCount() {
     return cacheResetCount.get();
   }
 }
