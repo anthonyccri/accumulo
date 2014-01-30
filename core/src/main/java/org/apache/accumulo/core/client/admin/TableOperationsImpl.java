@@ -1236,13 +1236,13 @@ public class TableOperationsImpl extends TableOperationsHelper {
 
     try {
       FileSystem fs = FileUtil.getFileSystem(CachedConfiguration.getInstance(), instance.getConfiguration());
-      ;
+
       Map<String,String> props = getExportedProps(fs, new Path(importDir, Constants.EXPORT_FILE));
 
-      for (String propKey : props.keySet()) {
-        if (Property.isClassProperty(propKey) && !props.get(propKey).contains(Constants.CORE_PACKAGE_NAME)) {
+      for (Entry<String,String> prop : props.entrySet()) {
+        if (Property.isClassProperty(prop.getKey()) && !prop.getValue().contains(Constants.CORE_PACKAGE_NAME)) {
           Logger.getLogger(this.getClass()).info(
-              "Imported table sets '" + propKey + "' to '" + props.get(propKey) + "'.  Ensure this class is on Accumulo classpath.");
+              "Imported table sets '" + prop.getKey() + "' to '" + prop.getValue() + "'.  Ensure this class is on Accumulo classpath.");
         }
       }
 
