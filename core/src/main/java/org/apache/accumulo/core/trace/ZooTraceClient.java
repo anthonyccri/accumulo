@@ -22,8 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import org.apache.accumulo.trace.instrument.receivers.SendSpansViaThrift;
+import org.apache.accumulo.core.Constants;
 import org.apache.accumulo.fate.zookeeper.ZooReader;
+import org.apache.accumulo.trace.instrument.receivers.SendSpansViaThrift;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
