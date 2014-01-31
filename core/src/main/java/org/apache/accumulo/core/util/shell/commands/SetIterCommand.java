@@ -242,8 +242,6 @@ public class SetIterCommand extends Command {
             if (input == null) {
               reader.printNewline();
               throw new IOException("Input stream closed");
-            } else {
-              input = new String(input);
             }
             
             if (input.length() == 0)
