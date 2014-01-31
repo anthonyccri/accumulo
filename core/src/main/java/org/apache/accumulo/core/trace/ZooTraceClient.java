@@ -73,7 +73,7 @@ public class ZooTraceClient extends SendSpansViaThrift implements Watcher {
       List<String> hosts = new ArrayList<String>();
       for (String child : children) {
         byte[] data = zoo.getData(path + "/" + child, null);
-        hosts.add(new String(data));
+        hosts.add(new String(data, Constants.UTF8));
       }
       this.hosts.clear();
       this.hosts.addAll(hosts);
