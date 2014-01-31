@@ -20,7 +20,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 
+import org.apache.accumulo.core.Constants;
 import org.apache.commons.vfs2.RandomAccessContent;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -153,7 +155,7 @@ public class HdfsRandomAccessContent implements RandomAccessContent {
    */
   @Override
   public String readLine() throws IOException {
-    BufferedReader d = new BufferedReader(new InputStreamReader(this.fis));
+    BufferedReader d = new BufferedReader(new InputStreamReader(this.fis, Charset.forName("UTF-8")));
     return d.readLine();
   }
   
