@@ -186,7 +186,7 @@ public class VerifyIngest {
             
             if (entry.getValue().compareTo(value) != 0) {
               log.error("unexpected value, rowNum : " + rowNum + " colNum : " + colNum);
-              log.error(" saw = " + new String(entry.getValue().get()) + " expected = " + new String(value));
+              log.error(" saw = " + new String(entry.getValue().get()) + " expected = " + new String(value, Constants.UTF8));
               errors++;
             }
             

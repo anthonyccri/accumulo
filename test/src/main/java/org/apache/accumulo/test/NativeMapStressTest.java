@@ -49,7 +49,7 @@ public class NativeMapStressTest {
   
   private static void put(NativeMap nm, String row, String val, int mc) {
     Mutation m = new Mutation(new Text(row));
-    m.put(new Text(), new Text(), Long.MAX_VALUE, new Value(val.getBytes()));
+    m.put(new Text(), new Text(), Long.MAX_VALUE, new Value(val.getBytes(Constants.UTF8)));
     nm.mutate(m, mc);
   }
   

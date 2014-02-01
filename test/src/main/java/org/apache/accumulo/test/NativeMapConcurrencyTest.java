@@ -60,7 +60,7 @@ public class NativeMapConcurrencyTest {
     for (int i = 0; i < numRows; i++) {
       Mutation m = nm(i + start);
       for (int j = 0; j < numCols; j++) {
-        Value val = new Value("test".getBytes());
+        Value val = new Value("test".getBytes(Constants.UTF8));
         pc(m, j, val);
       }
       nm.mutate(m, mc++);

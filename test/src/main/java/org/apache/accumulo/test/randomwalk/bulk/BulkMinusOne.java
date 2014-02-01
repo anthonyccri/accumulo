@@ -21,7 +21,7 @@ import org.apache.accumulo.test.randomwalk.State;
 
 public class BulkMinusOne extends BulkTest {
   
-  private static final Value negOne = new Value("-1".getBytes());
+  private static final Value negOne = new Value("-1".getBytes(Constants.UTF8));
   
   @Override
   protected void runLater(State state) throws Exception {
