@@ -19,6 +19,7 @@ package org.apache.accumulo.test.randomwalk.security;
 import java.io.IOException;
 import java.util.Map;
 
+import org.apache.accumulo.core.Constants;
 import org.apache.accumulo.core.client.Connector;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.SystemPermission;

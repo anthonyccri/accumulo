@@ -16,6 +16,7 @@
  */
 package org.apache.accumulo.test.randomwalk.bulk;
 
+import org.apache.accumulo.core.Constants;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.test.randomwalk.State;
 

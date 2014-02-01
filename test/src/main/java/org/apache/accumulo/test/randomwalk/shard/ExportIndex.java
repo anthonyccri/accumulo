@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.Properties;
 
+import org.apache.accumulo.core.Constants;
 import org.apache.accumulo.core.conf.Property;
 import org.apache.accumulo.core.util.CachedConfiguration;
 import org.apache.accumulo.test.randomwalk.State;
