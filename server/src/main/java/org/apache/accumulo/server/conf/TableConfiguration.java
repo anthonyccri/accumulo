@@ -147,4 +147,15 @@ public class TableConfiguration extends AccumuloConfiguration {
   public String getTableId() {
     return table;
   }
+
+  @Override
+  public void invalidateCache() {
+    if (null != tablePropCache) {
+      synchronized (TableConfiguration.class) {
+        if (null != tablePropCache) {
+          tablePropCache = null;
+        }
+      }
+    }
+  }
 }
