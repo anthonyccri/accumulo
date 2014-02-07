@@ -482,20 +482,27 @@ public class Monitor {
       server.addServlet(ShellServlet.class, "/shell");
     server.start();
     
-    
+    InetSocketAddress monitorAddress = null;
     try {
       hostname = InetAddress.getLocalHost().getHostName();
       
       log.debug("Using " + hostname + " to advertise monitor location in ZooKeeper");
       
-      String monitorAddress = org.apache.accumulo.core.util.AddressUtil.toString(new InetSocketAddress(hostname, server.getPort()));
-      ZooReaderWriter.getInstance().putPersistentData(ZooUtil.getRoot(instance) + Constants.ZMONITOR, monitorAddress.getBytes(Constants.UTF8),
+      monitorAddress = new InetSocketAddress(hostname, server.getPort());
+      String monitorAddressAndPort = org.apache.accumulo.core.util.AddressUtil.toString(monitorAddress);
+      ZooReaderWriter.getInstance().putPersistentData(ZooUtil.getRoot(instance) + Constants.ZMONITOR, monitorAddressAndPort.getBytes(Constants.UTF8),
           NodeExistsPolicy.OVERWRITE);
       log.info("Set monitor address in zookeeper to " + monitorAddress);
     } catch (Exception ex) {
-      log.error("Unable to set monitor address in zookeeper");
+      log.error("Unable to set monitor HTTP address in zookeeper", ex);
     }
-    LogService.startLogListener(Monitor.getSystemConfiguration(), instance.getInstanceID());
+    
+    if (null != monitorAddress) {
+      LogService.startLogListener(Monitor.getSystemConfiguration(), instance.getInstanceID(), 
+          org.apache.accumulo.core.util.AddressUtil.getHostAddress(monitorAddress));
+    } else {
+      log.warn("Not starting log4j listener as we could not determine address to use");
+    }
     
     new Daemon(new LoggingRunnable(log, new ZooKeeperStatus()), "ZooKeeperStatus").start();
     
