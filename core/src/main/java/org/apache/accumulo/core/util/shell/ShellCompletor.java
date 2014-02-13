@@ -24,7 +24,7 @@ import java.util.Set;
 
 import jline.Completor;
 
-import org.apache.accumulo.core.util.shell.Shell.Command.CompletionSet;
+import org.apache.accumulo.core.util.shell.Command.CompletionSet;
 import org.apache.accumulo.core.util.shell.commands.QuotedStringTokenizer;
 
 public class ShellCompletor implements Completor {
@@ -93,10 +93,10 @@ public class ShellCompletor implements Completor {
           // we're in a subcommand so try to match the universal
           // option flags if we're there
           if (current_string_token.trim().equals("-" + Shell.tableOption)) {
-            candidates.addAll(options.get(Shell.Command.CompletionSet.TABLENAMES));
+            candidates.addAll(options.get(Command.CompletionSet.TABLENAMES));
             prefix += "-" + Shell.tableOption + " ";
           } else if (current_string_token.trim().equals("-" + Shell.userOption)) {
-            candidates.addAll(options.get(Shell.Command.CompletionSet.USERNAMES));
+            candidates.addAll(options.get(Command.CompletionSet.USERNAMES));
             prefix += "-" + Shell.userOption + " ";
           } else if (current_command_token != null) {
             Token next = current_command_token.getSubcommand(current_string_token);
@@ -117,11 +117,11 @@ public class ShellCompletor implements Completor {
         // need to match current command
         // if we're in -t <table> or -u <user> complete those
         if (inTableFlag) {
-          for (String a : options.get(Shell.Command.CompletionSet.TABLENAMES))
+          for (String a : options.get(Command.CompletionSet.TABLENAMES))
             if (a.startsWith(current_string_token))
               candidates.add(a);
         } else if (inUserFlag) {
-          for (String a : options.get(Shell.Command.CompletionSet.USERNAMES))
+          for (String a : options.get(Command.CompletionSet.USERNAMES))
             if (a.startsWith(current_string_token))
               candidates.add(a);
         } else if (current_command_token != null)

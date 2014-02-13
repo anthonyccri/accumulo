@@ -21,7 +21,7 @@ import java.io.IOException;
 import jline.ConsoleReader;
 
 import org.apache.accumulo.core.util.shell.Shell;
-import org.apache.accumulo.core.util.shell.Shell.Command;
+import org.apache.accumulo.core.util.shell.Command;
 import org.apache.accumulo.start.classloader.vfs.AccumuloVFSClassLoader;
 import org.apache.accumulo.start.classloader.vfs.AccumuloVFSClassLoader.Printer;
 import org.apache.commons.cli.CommandLine;

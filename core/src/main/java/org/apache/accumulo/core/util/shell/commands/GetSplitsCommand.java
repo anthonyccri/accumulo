@@ -34,7 +34,7 @@ import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.util.TextUtil;
 import org.apache.accumulo.core.util.format.BinaryFormatter;
 import org.apache.accumulo.core.util.shell.Shell;
-import org.apache.accumulo.core.util.shell.Shell.Command;
+import org.apache.accumulo.core.util.shell.Command;
 import org.apache.accumulo.core.util.shell.Shell.PrintFile;
 import org.apache.accumulo.core.util.shell.Shell.PrintLine;
 import org.apache.accumulo.core.util.shell.Shell.PrintShell;

@@ -23,7 +23,7 @@ import java.util.Set;
 
 import org.apache.accumulo.core.util.BadArgumentException;
 import org.apache.accumulo.core.util.shell.Shell;
-import org.apache.accumulo.core.util.shell.Shell.Command;
+import org.apache.accumulo.core.util.shell.Command;
 import org.apache.accumulo.core.util.shell.Token;
 import org.apache.commons.cli.CommandLine;
 

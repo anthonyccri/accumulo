@@ -20,7 +20,7 @@ import java.io.IOException;
 
 import org.apache.accumulo.core.security.SystemPermission;
 import org.apache.accumulo.core.util.shell.Shell;
-import org.apache.accumulo.core.util.shell.Shell.Command;
+import org.apache.accumulo.core.util.shell.Command;
 import org.apache.commons.cli.CommandLine;
 
 public class SystemPermissionsCommand extends Command {

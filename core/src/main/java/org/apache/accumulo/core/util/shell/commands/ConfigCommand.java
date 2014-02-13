@@ -34,7 +34,7 @@ import org.apache.accumulo.core.conf.Property;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.accumulo.core.util.BadArgumentException;
 import org.apache.accumulo.core.util.shell.Shell;
-import org.apache.accumulo.core.util.shell.Shell.Command;
+import org.apache.accumulo.core.util.shell.Command;
 import org.apache.accumulo.core.util.shell.Shell.PrintFile;
 import org.apache.accumulo.core.util.shell.Token;
 import org.apache.commons.cli.CommandLine;

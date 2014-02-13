@@ -16,38 +16,10 @@
  */
 package org.apache.accumulo.core.util.shell;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.net.InetAddress;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.UUID;
-
 import jline.ConsoleReader;
 import jline.History;
-
 import org.apache.accumulo.core.Constants;
-import org.apache.accumulo.core.client.AccumuloException;
-import org.apache.accumulo.core.client.AccumuloSecurityException;
-import org.apache.accumulo.core.client.Connector;
-import org.apache.accumulo.core.client.Instance;
-import org.apache.accumulo.core.client.IteratorSetting;
-import org.apache.accumulo.core.client.TableNotFoundException;
-import org.apache.accumulo.core.client.ZooKeeperInstance;
+import org.apache.accumulo.core.client.*;
 import org.apache.accumulo.core.client.mock.MockInstance;
 import org.apache.accumulo.core.client.security.tokens.AuthenticationToken;
 import org.apache.accumulo.core.client.security.tokens.AuthenticationToken.Properties;
@@ -65,95 +37,24 @@ import org.apache.accumulo.core.util.format.BinaryFormatter;
 import org.apache.accumulo.core.util.format.DefaultFormatter;
 import org.apache.accumulo.core.util.format.Formatter;
 import org.apache.accumulo.core.util.format.FormatterFactory;
-import org.apache.accumulo.core.util.shell.commands.AboutCommand;
-import org.apache.accumulo.core.util.shell.commands.AddAuthsCommand;
-import org.apache.accumulo.core.util.shell.commands.AddSplitsCommand;
-import org.apache.accumulo.core.util.shell.commands.AuthenticateCommand;
-import org.apache.accumulo.core.util.shell.commands.ByeCommand;
-import org.apache.accumulo.core.util.shell.commands.ClasspathCommand;
-import org.apache.accumulo.core.util.shell.commands.ClearCommand;
-import org.apache.accumulo.core.util.shell.commands.CloneTableCommand;
-import org.apache.accumulo.core.util.shell.commands.ClsCommand;
-import org.apache.accumulo.core.util.shell.commands.CompactCommand;
-import org.apache.accumulo.core.util.shell.commands.ConfigCommand;
-import org.apache.accumulo.core.util.shell.commands.ConstraintCommand;
-import org.apache.accumulo.core.util.shell.commands.CreateTableCommand;
-import org.apache.accumulo.core.util.shell.commands.CreateUserCommand;
-import org.apache.accumulo.core.util.shell.commands.DUCommand;
-import org.apache.accumulo.core.util.shell.commands.DebugCommand;
-import org.apache.accumulo.core.util.shell.commands.DeleteCommand;
-import org.apache.accumulo.core.util.shell.commands.DeleteIterCommand;
-import org.apache.accumulo.core.util.shell.commands.DeleteManyCommand;
-import org.apache.accumulo.core.util.shell.commands.DeleteRowsCommand;
-import org.apache.accumulo.core.util.shell.commands.DeleteScanIterCommand;
-import org.apache.accumulo.core.util.shell.commands.DeleteShellIterCommand;
-import org.apache.accumulo.core.util.shell.commands.DeleteTableCommand;
-import org.apache.accumulo.core.util.shell.commands.DeleteUserCommand;
-import org.apache.accumulo.core.util.shell.commands.DropTableCommand;
-import org.apache.accumulo.core.util.shell.commands.DropUserCommand;
-import org.apache.accumulo.core.util.shell.commands.EGrepCommand;
-import org.apache.accumulo.core.util.shell.commands.ExecfileCommand;
-import org.apache.accumulo.core.util.shell.commands.ExitCommand;
-import org.apache.accumulo.core.util.shell.commands.ExportTableCommand;
-import org.apache.accumulo.core.util.shell.commands.FlushCommand;
-import org.apache.accumulo.core.util.shell.commands.FormatterCommand;
-import org.apache.accumulo.core.util.shell.commands.GetAuthsCommand;
-import org.apache.accumulo.core.util.shell.commands.GetGroupsCommand;
-import org.apache.accumulo.core.util.shell.commands.GetSplitsCommand;
-import org.apache.accumulo.core.util.shell.commands.GrantCommand;
-import org.apache.accumulo.core.util.shell.commands.GrepCommand;
-import org.apache.accumulo.core.util.shell.commands.HelpCommand;
-import org.apache.accumulo.core.util.shell.commands.HiddenCommand;
-import org.apache.accumulo.core.util.shell.commands.HistoryCommand;
-import org.apache.accumulo.core.util.shell.commands.ImportDirectoryCommand;
-import org.apache.accumulo.core.util.shell.commands.ImportTableCommand;
-import org.apache.accumulo.core.util.shell.commands.InfoCommand;
-import org.apache.accumulo.core.util.shell.commands.InsertCommand;
-import org.apache.accumulo.core.util.shell.commands.InterpreterCommand;
-import org.apache.accumulo.core.util.shell.commands.ListCompactionsCommand;
-import org.apache.accumulo.core.util.shell.commands.ListIterCommand;
-import org.apache.accumulo.core.util.shell.commands.ListScansCommand;
-import org.apache.accumulo.core.util.shell.commands.ListShellIterCommand;
-import org.apache.accumulo.core.util.shell.commands.MaxRowCommand;
-import org.apache.accumulo.core.util.shell.commands.MergeCommand;
-import org.apache.accumulo.core.util.shell.commands.NoTableCommand;
-import org.apache.accumulo.core.util.shell.commands.OfflineCommand;
-import org.apache.accumulo.core.util.shell.commands.OnlineCommand;
-import org.apache.accumulo.core.util.shell.commands.PasswdCommand;
-import org.apache.accumulo.core.util.shell.commands.PingCommand;
-import org.apache.accumulo.core.util.shell.commands.QuestionCommand;
-import org.apache.accumulo.core.util.shell.commands.QuitCommand;
-import org.apache.accumulo.core.util.shell.commands.QuotedStringTokenizer;
-import org.apache.accumulo.core.util.shell.commands.RenameTableCommand;
-import org.apache.accumulo.core.util.shell.commands.RevokeCommand;
-import org.apache.accumulo.core.util.shell.commands.ScanCommand;
-import org.apache.accumulo.core.util.shell.commands.SetAuthsCommand;
-import org.apache.accumulo.core.util.shell.commands.SetGroupsCommand;
-import org.apache.accumulo.core.util.shell.commands.SetIterCommand;
-import org.apache.accumulo.core.util.shell.commands.SetScanIterCommand;
-import org.apache.accumulo.core.util.shell.commands.SetShellIterCommand;
-import org.apache.accumulo.core.util.shell.commands.SleepCommand;
-import org.apache.accumulo.core.util.shell.commands.SystemPermissionsCommand;
-import org.apache.accumulo.core.util.shell.commands.TableCommand;
-import org.apache.accumulo.core.util.shell.commands.TablePermissionsCommand;
-import org.apache.accumulo.core.util.shell.commands.TablesCommand;
-import org.apache.accumulo.core.util.shell.commands.TraceCommand;
-import org.apache.accumulo.core.util.shell.commands.UserCommand;
-import org.apache.accumulo.core.util.shell.commands.UserPermissionsCommand;
-import org.apache.accumulo.core.util.shell.commands.UsersCommand;
-import org.apache.accumulo.core.util.shell.commands.WhoAmICommand;
+import org.apache.accumulo.core.util.shell.commands.*;
 import org.apache.accumulo.fate.zookeeper.ZooReader;
-import org.apache.commons.cli.BasicParser;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.MissingArgumentException;
-import org.apache.commons.cli.MissingOptionException;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
+import org.apache.accumulo.start.classloader.AccumuloClassLoader;
+import org.apache.accumulo.start.classloader.vfs.AccumuloVFSClassLoader;
+import org.apache.commons.cli.*;
+import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileType;
 import org.apache.hadoop.fs.Path;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+
+import java.io.*;
+import java.net.InetAddress;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.*;
+import java.util.Map.Entry;
 
 /**
  * A convenient console interface to perform basic accumulo functions Includes auto-complete, help, and quoted strings with escape sequences
@@ -365,7 +266,12 @@ public class Shell extends ShellOptions {
     commandGrouping.put("-- Table Administration Commands --------", tableCommands);
     commandGrouping.put("-- Table Control Commands ---------------", tableControlCommands);
     commandGrouping.put("-- User Administration Commands ---------", userCommands);
-    
+
+    Command[] extensionCommands = buildExtensionsCommands();
+    if(extensionCommands != null) {
+      commandGrouping.put("-- Extension Commands -------------------", extensionCommands);
+    }
+
     for (Command[] cmds : commandGrouping.values()) {
       for (Command cmd : cmds)
         commandFactory.put(cmd.getName(), cmd);
@@ -375,7 +281,43 @@ public class Shell extends ShellOptions {
     }
     return configError;
   }
-  
+
+  // Loads extension commands if available
+  private Command[] buildExtensionsCommands() {
+    try {
+      ClassLoader cl = buildExtClassLoader();
+      ServiceLoader<Command> commandClasses = ServiceLoader.load(Command.class, cl);
+      Object[] ret = IteratorUtils.toArray(commandClasses.iterator(), Command.class);
+      if(ret.length > 0) return (Command[]) ret;
+      else return null;
+    } catch (Exception e) {
+    }
+    return null;
+  }
+
+  // workaround for VFS not properly loading SPI defined resources
+  private ClassLoader buildExtClassLoader() throws IOException {
+    String uri =
+      AccumuloClassLoader.replaceEnvVars(
+        AccumuloVFSClassLoader.DEFAULT_DYNAMIC_CLASSPATH_VALUE.trim(),
+        System.getenv());
+
+    FileObject fo = AccumuloVFSClassLoader.generateVfs().resolveFile(uri);
+    String pattern = fo.getName().getBaseName();
+    List<URL> commandsURLs = new ArrayList<URL>();
+    if (fo.getParent() != null && fo.getParent().getType() == FileType.FOLDER) {
+      FileObject[] children = fo.getParent().getChildren();
+      for (FileObject child : children) {
+        if (child.getType() == FileType.FILE && child.getName().getBaseName().matches(pattern)) {
+          commandsURLs.add(child.getURL());
+        }
+      }
+    }
+    return new URLClassLoader(
+      commandsURLs.toArray(new URL[commandsURLs.size()]),
+      AccumuloVFSClassLoader.getClassLoader());
+  }
+
   protected void setInstance(CommandLine cl) {
     // should only be one instance option set
     instance = null;
@@ -677,108 +619,8 @@ public class Shell extends ShellOptions {
     }
     return new ShellCompletor(rootToken, options);
   }
-  
-  /**
-   * The Command class represents a command to be run in the shell. It contains the methods to execute along with some methods to help tab completion, and
-   * return the command name, help, and usage.
-   */
-  public static abstract class Command {
-    // Helper methods for completion
-    public enum CompletionSet {
-      TABLENAMES, USERNAMES, COMMANDS
-    }
-    
-    static Set<String> getCommandNames(Map<CompletionSet,Set<String>> objects) {
-      return objects.get(CompletionSet.COMMANDS);
-    }
-    
-    static Set<String> getTableNames(Map<CompletionSet,Set<String>> objects) {
-      return objects.get(CompletionSet.TABLENAMES);
-    }
-    
-    static Set<String> getUserNames(Map<CompletionSet,Set<String>> objects) {
-      return objects.get(CompletionSet.USERNAMES);
-    }
-    
-    public void registerCompletionGeneral(Token root, Set<String> args, boolean caseSens) {
-      Token t = new Token(args);
-      t.setCaseSensitive(caseSens);
-      
-      Token command = new Token(getName());
-      command.addSubcommand(t);
-      
-      root.addSubcommand(command);
-    }
-    
-    public void registerCompletionForTables(Token root, Map<CompletionSet,Set<String>> completionSet) {
-      registerCompletionGeneral(root, completionSet.get(CompletionSet.TABLENAMES), true);
-    }
-    
-    public void registerCompletionForUsers(Token root, Map<CompletionSet,Set<String>> completionSet) {
-      registerCompletionGeneral(root, completionSet.get(CompletionSet.USERNAMES), true);
-    }
-    
-    public void registerCompletionForCommands(Token root, Map<CompletionSet,Set<String>> completionSet) {
-      registerCompletionGeneral(root, completionSet.get(CompletionSet.COMMANDS), false);
-    }
-    
-    // abstract methods to override
-    public abstract int execute(String fullCommand, CommandLine cl, Shell shellState) throws Exception;
-    
-    public abstract String description();
-    
-    /**
-     * If the number of arguments is not always zero (not including those arguments handled through Options), make sure to override the {@link #usage()} method.
-     * Otherwise, {@link #usage()} does need to be overridden.
-     */
-    public abstract int numArgs();
-    
-    // OPTIONAL methods to override:
-    
-    // the general version of getname uses reflection to get the class name
-    // and then cuts off the suffix -Command to get the name of the command
-    public String getName() {
-      String s = this.getClass().getName();
-      int st = Math.max(s.lastIndexOf('$'), s.lastIndexOf('.'));
-      int i = s.indexOf("Command");
-      return i > 0 ? s.substring(st + 1, i).toLowerCase(Locale.ENGLISH) : null;
-    }
-    
-    // The general version of this method adds the name
-    // of the command to the completion tree
-    public void registerCompletion(Token root, Map<CompletionSet,Set<String>> completion_set) {
-      root.addSubcommand(new Token(getName()));
-    }
-    
-    // The general version of this method uses the HelpFormatter
-    // that comes with the apache Options package to print out the help
-    public final void printHelp(Shell shellState) {
-      shellState.printHelp(usage(), "description: " + this.description(), getOptionsWithHelp());
-    }
-    
-    public final void printHelp(Shell shellState, int width) {
-      shellState.printHelp(usage(), "description: " + this.description(), getOptionsWithHelp(), width);
-    }
-    
-    // Get options with help
-    public final Options getOptionsWithHelp() {
-      Options opts = getOptions();
-      opts.addOption(new Option(helpOption, helpLongOption, false, "display this help"));
-      return opts;
-    }
-    
-    // General usage is just the command
-    public String usage() {
-      return getName();
-    }
-    
-    // General Options are empty
-    public Options getOptions() {
-      return new Options();
-    }
-  }
-  
-  public interface PrintLine {
+
+    public interface PrintLine {
     public void print(String s);
     
     public void close();
@@ -938,11 +780,11 @@ public class Shell extends ShellOptions {
     return Logger.getLogger(Constants.CORE_PACKAGE_NAME).isTraceEnabled();
   }
   
-  private final void printHelp(String usage, String description, Options opts) {
+  final void printHelp(String usage, String description, Options opts) {
     printHelp(usage, description, opts, Integer.MAX_VALUE);
   }
   
-  private final void printHelp(String usage, String description, Options opts, int width) {
+  final void printHelp(String usage, String description, Options opts, int width) {
     PrintWriter pw = new PrintWriter(new OutputStreamWriter(System.err, Constants.UTF8));
     new HelpFormatter().printHelp(pw, width, usage, description, opts, 2, 5, null, true);
     pw.flush();
